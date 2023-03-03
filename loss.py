@@ -14,11 +14,10 @@ import torchvision
 class VGGPerceptualLoss(torch.nn.Module):
     def __init__(self, resize=True):
         super(VGGPerceptualLoss, self).__init__()
-        blocks = []
-        blocks.append(torchvision.models.vgg16(pretrained=True).features[:4].eval())
-        blocks.append(torchvision.models.vgg16(pretrained=True).features[4:9].eval())
-        blocks.append(torchvision.models.vgg16(pretrained=True).features[9:16].eval())
-        blocks.append(torchvision.models.vgg16(pretrained=True).features[16:23].eval())
+        blocks = [torchvision.models.vgg16(pretrained=True).features[:4].eval(),
+                  torchvision.models.vgg16(pretrained=True).features[4:9].eval(),
+                  torchvision.models.vgg16(pretrained=True).features[9:16].eval(),
+                  torchvision.models.vgg16(pretrained=True).features[16:23].eval()]
         for bl in blocks:
             for p in bl.parameters():
                 p.requires_grad = False
@@ -74,18 +73,18 @@ class MyLoss(nn.Module):
         ploss = ploss_net(target, pred)
 
         # mse + lssim + perceptual loss
-        return mse + ssim_loss + 0.1 * ploss
+        return mse + ssim_loss + (0.1 * ploss)
 
 
-# def test():
-#     pred = torch.randn((1, 3, 400, 400))
-#     gt = torch.randn((1, 3, 400, 400))
-#
-#     loss_net = MyLoss()
-#
-#     loss = loss_net(gt, pred)
-#     print(loss)
-#
-#
+def test():
+    pred = torch.randn((1, 3, 400, 400))
+    gt = torch.randn((1, 3, 400, 400))
+
+    loss_net = MyLoss()
+
+    loss = loss_net(gt, pred)
+    print(loss)
+
+
 # if __name__ == "__main__":
 #     test()

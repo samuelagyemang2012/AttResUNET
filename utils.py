@@ -1,11 +1,9 @@
 import torch
 import torchvision
-# from torch.utils.data import Dataset
-# from dataset import CarvanaDataset
 from torch.utils.data import DataLoader
 
 
-def save_checkpoint(state, filename="my_checkpoint.pth.tar"):
+def save_checkpoint(state, filename="dehaze_checkpoint.pth.tar"):
     print("=> Saving checkpoint")
     torch.save(state, filename)
 
@@ -15,7 +13,8 @@ def load_checkpoint(checkpoint, model):
     model.load_state_dict(checkpoint["state_dict"])
 
 
-def get_loaders(dataset, train_dir, train_dir2, val_dir, val_dir2, batch_size, train_transform, val_transform, num_workers=4, pin_memory=True):
+def get_loaders(dataset, train_dir, train_dir2, val_dir, val_dir2, batch_size, train_transform, val_transform,
+                num_workers=4, pin_memory=True):
     train_ds = dataset(
         image_dir=train_dir,
         mask_dir=train_dir2,
@@ -57,6 +56,7 @@ def check_accuracy(loader, model, device="cuda"):
         for x, y in loader:
             x = x.to(device)
             y = y.to(device).unsqueeze(1)
+
             preds = torch.sigmoid(model(x))
             preds = (preds > 0.5).float()
             num_correct += (preds == y).sum()
@@ -65,11 +65,13 @@ def check_accuracy(loader, model, device="cuda"):
                     (preds + y).sum() + 1e-8
             )
 
-    print(
-        f"Got {num_correct}/{num_pixels} with acc {num_correct / num_pixels * 100:.2f}"
-    )
+    print(f"Got {num_correct}/{num_pixels} with acc {num_correct / num_pixels * 100:.2f}")
     print(f"Dice score: {dice_score / len(loader)}")
     model.train()
+
+
+def check_psnr_ssim(loader, model, device="cuda"):
+    pass
 
 
 def save_predictions_as_imgs(loader, model, folder="saved_images/", device="cuda"):

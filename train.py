@@ -4,7 +4,7 @@ from albumentations.pytorch import ToTensorV2
 from tqdm import tqdm
 import torch.nn as nn
 import torch.optim as optim
-from model import UNET, AttResUNET
+from model import AttResUNET
 from dataset import SOTS
 from utils import (
     load_checkpoint,
@@ -14,6 +14,7 @@ from utils import (
     save_predictions_as_imgs,
 )
 from lion_pytorch import Lion
+from loss import MyLoss
 
 # Hyperparameters etc.
 DATASET = SOTS
@@ -87,7 +88,7 @@ def main():
     model = AttResUNET(in_channels=3, out_channels=3).to(DEVICE)
 
     # loss function
-    loss_fn = nn.BCEWithLogitsLoss()
+    loss_fn = MyLoss()
 
     # optimizer
     # optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
@@ -131,5 +132,5 @@ def main():
         )
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

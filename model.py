@@ -19,11 +19,11 @@ class UNET(nn.Module):
 
         # Up part of UNET
         for feature in reversed(features):
-            self.ups.append(nn.ConvTranspose2d(feature * 2, feature, kernel_size=2, stride=2))
+            self.ups.append(nn.ConvTranspose2d(feature * 2, feature, kernel_size=(2, 2), stride=(2, 2)))
             self.ups.append(DoubleConv(feature * 2, feature))
 
         self.bottleneck = DoubleConv(features[-1], features[-1] * 2)
-        self.final_conv = nn.Conv2d(features[0], out_channels, kernel_size=1)
+        self.final_conv = nn.Conv2d(features[0], out_channels, kernel_size=(1, 1))
 
     def forward(self, x):
         skip_connections = []
@@ -76,7 +76,7 @@ class AttResUNET(nn.Module):
         self.a2 = AttentionBlockIN(F_g=64, F_l=64, F_int=32)
         self.u2_c2 = ResBlockIN(in_channels=128, out_channels=64)
 
-        self.c1x1 = nn.Conv2d(64, out_channels, 1, 1, 0)
+        self.c1x1 = nn.Conv2d(64, out_channels, kernel_size=(1, 1), stride=(1, 1), padding=0)
 
     def forward(self, x):
         x1 = self.c1(x)
@@ -119,11 +119,13 @@ class AttResUNET(nn.Module):
 
 
 def test():
-    x = torch.randn((1, 3, 400, 400))
+    x = torch.randn((1, 400, 400, 3))
+    x = x.permute((0, 3, 1, 2))
+    print(x.shape)
     model = AttResUNET(in_channels=3, out_channels=3)
     preds = model(x)
     print(preds.shape)
 
 
-if __name__ == "__main__":
-    test()
+# if __name__ == "__main__":
+#     test()

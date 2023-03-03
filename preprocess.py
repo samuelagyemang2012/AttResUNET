@@ -3,8 +3,8 @@ import os
 import numpy as np
 from tqdm import tqdm
 
-hazy_folder_path = "F:/datasets/SOTs/outdoor_CLAHE/hazy/"
-clahe_dest_path = "F:/datasets/SOTs/outdoor_CLAHE/clahe_sharp/"
+hazy_folder_path = "D:/Datasets/SOTs/outdoor_CLAHE/hazy/"
+clahe_dest_path = "D:/Datasets/SOTs/outdoor_CLAHE/clahe_no_sharp/"
 
 
 def sharpen_image(image):
@@ -40,15 +40,17 @@ def do_clahe(img):
     return img_
 
 
-sharpen = True
+if __name__ == "__main__":
 
-hazy_files = os.listdir(hazy_folder_path)
+    sharpen = False
 
-for hf in tqdm(hazy_files):
-    arr = cv2.imread(hazy_folder_path + hf)
-    if sharpen:
-        arr = sharpen_image(arr)
+    hazy_files = os.listdir(hazy_folder_path)
 
-    arr = do_clahe(arr)
+    for hf in tqdm(hazy_files):
+        arr = cv2.imread(hazy_folder_path + hf)
+        if sharpen:
+            arr = sharpen_image(arr)
 
-    cv2.imwrite(clahe_dest_path + hf, arr)
+        arr = do_clahe(arr)
+
+        cv2.imwrite(clahe_dest_path + hf, arr)
