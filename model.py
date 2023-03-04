@@ -119,9 +119,9 @@ class AttResUNET(nn.Module):
 
 
 def test():
-    x = torch.randn((1, 400, 400, 3))
+    x = torch.randn((1, 32, 32, 3))
     x = x.permute((0, 3, 1, 2))
-    print(x.shape)
+    # print(x.shape)
     model = AttResUNET(in_channels=3, out_channels=3)
     preds = model(x)
     print(preds.shape)

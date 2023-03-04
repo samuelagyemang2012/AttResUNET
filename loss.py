@@ -14,6 +14,7 @@ import torchvision
 class VGGPerceptualLoss(torch.nn.Module):
     def __init__(self, resize=True):
         super(VGGPerceptualLoss, self).__init__()
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         blocks = [torchvision.models.vgg16(pretrained=True).features[:4].eval(),
                   torchvision.models.vgg16(pretrained=True).features[4:9].eval(),
                   torchvision.models.vgg16(pretrained=True).features[9:16].eval(),
@@ -21,16 +22,17 @@ class VGGPerceptualLoss(torch.nn.Module):
         for bl in blocks:
             for p in bl.parameters():
                 p.requires_grad = False
-        self.blocks = torch.nn.ModuleList(blocks)
+        self.blocks = torch.nn.ModuleList(blocks).to(self.device)
         self.transform = torch.nn.functional.interpolate
         self.resize = resize
-        self.register_buffer("mean", torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
-        self.register_buffer("std", torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
+        self.register_buffer("mean", torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(self.device))
+        self.register_buffer("std", torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(self.device))
 
     def forward(self, input, target, feature_layers=[0, 1, 2, 3], style_layers=[]):
         if input.shape[1] != 3:
-            input = input.repeat(1, 3, 1, 1)
-            target = target.repeat(1, 3, 1, 1)
+            input = input.repeat(1, 3, 1, 1).to(self.device)
+            target = target.repeat(1, 3, 1, 1).to(self.device)
+
         input = (input - self.mean) / self.std
         target = (target - self.mean) / self.std
         if self.resize:
@@ -86,5 +88,5 @@ def test():
     print(loss)
 
 
-# if __name__ == "__main__":
-#     test()
+if __name__ == "__main__":
+    test()
