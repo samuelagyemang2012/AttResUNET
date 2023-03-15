@@ -1,7 +1,13 @@
 import os
 from PIL import Image
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import numpy as np
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+from PIL import Image
+import torchvision
+import matplotlib.pyplot as plt
+import cv2
 
 
 class SOTS(Dataset):
@@ -44,23 +50,58 @@ class SOTS(Dataset):
 
     def rgb_loader(self, path):
         with open(path, 'rb') as f:
-            img = np.array(Image.open(f).convert('RGB')).astype(np.float32)
-            # img = np.transpose(img, (2, 0, 1))
+            img = np.array(Image.open(f).convert('RGB')).astype(np.float32)  # .astype('uint8')
             return img
-            # return img.transpose((2, 0, 1))
 
     def __len__(self):
         return self.size
 
-    # def __getitem__(self, index):
-    #     hazy_img_path = os.path.join(self.hazy_img_dir, self.images[index])
-    #     clear_img_path = os.path.join(self.clear_img_dir, self.images[index])
-    #     hazy_image = np.array(Image.open(hazy_img_path).convert("RGB"))
-    #     clear_image = np.array(Image.open(clear_img_path).convert("RGB"))
-    #
-    #     if self.transform is not None:
-    #         augmentations = self.transform(image=hazy_image, mask=clear_image)
-    #         hazy_image = augmentations["hazy_image"]
-    #         clear_image = augmentations["clear_image"]
-    #
-    #     return hazy_image, clear_image
+
+def test():
+    def process(arr):
+        arr = arr.permute(0, 1, 2).numpy()
+        arr = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
+        arr = arr.astype('uint8')
+
+        return arr
+
+    def show_images(hazy, clear):
+        cv2.imshow("haze", hazy)
+        cv2.imshow("clear", clear)
+        cv2.waitKey(-1)
+
+    train_transform = A.Compose([
+        A.Resize(height=400, width=400),
+        A.Rotate(limit=35, p=1.0),
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.1),
+        # A.Normalize(
+        #     mean=[0.0, 0.0, 0.0],
+        #     std=[1.0, 1.0, 1.0],
+        # max_pixel_value=255.0,
+        # ),
+        # ToTensorV2()
+    ])
+
+    TRAIN_IMG_DIR = "C:/Users/Administrator/Desktop/datasets/SOTs/data/SOTS/train/hazy/"
+    TRAIN_MASK_DIR = "C:/Users/Administrator/Desktop/datasets/SOTs/data/SOTS/train/clear/"
+    VAL_IMG_DIR = "C:/Users/Administrator/Desktop/datasets/SOTs/data/SOTS/val/hazy/"
+    VAL_MASK_DIR = "C:/Users/Administrator/Desktop/datasets/SOTs/data/SOTS/val/clear/"
+
+    train_dataset = SOTS(image_dir=TRAIN_IMG_DIR, mask_dir=TRAIN_MASK_DIR, transform=train_transform)
+    loader = DataLoader(dataset=train_dataset, batch_size=4, shuffle=True, num_workers=0)
+
+    examples = next(iter(loader))
+    hazy_images, clear_images = examples
+
+    for i, b in enumerate(hazy_images):
+        print(b.shape)
+
+        img1 = process(b)
+        img2 = process(clear_images[i])
+
+        show_images(img1, img2)
+
+
+# if __name__ == "__main__":
+#     test()

@@ -21,17 +21,17 @@ DATASET = SOTS
 LEARNING_RATE = 1e-4
 WEIGHT_DECAY = 1e-2
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-BATCH_SIZE = 1
-NUM_EPOCHS = 3
+BATCH_SIZE = 2
+NUM_EPOCHS = 1
 NUM_WORKERS = 2
 IMAGE_HEIGHT = 400  # 1280 originally
 IMAGE_WIDTH = 400  # 1918 originally
 PIN_MEMORY = True
 LOAD_MODEL = False
-TRAIN_IMG_DIR = "data/train_images/"
-TRAIN_MASK_DIR = "data/train_masks/"
-VAL_IMG_DIR = "data/val_images/"
-VAL_MASK_DIR = "data/val_masks/"
+TRAIN_IMG_DIR = "C:/Users/Administrator/Desktop/datasets/SOTs/data/SOTS/train/hazy/"
+TRAIN_MASK_DIR = "C:/Users/Administrator/Desktop/datasets/SOTs/data/SOTS/train/clear/"
+VAL_IMG_DIR = "C:/Users/Administrator/Desktop/datasets/SOTs/data/SOTS/val/hazy/"
+VAL_MASK_DIR = "C:/Users/Administrator/Desktop/datasets/SOTs/data/SOTS/val/clear/"
 
 
 def train_fn(loader, model, optimizer, loss_fn, scaler):
@@ -88,7 +88,7 @@ def main():
     model = AttResUNET(in_channels=3, out_channels=3).to(DEVICE)
 
     # loss function
-    loss_fn = MyLoss()
+    loss_fn = MyLoss().to(DEVICE)
 
     # optimizer
     # optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)

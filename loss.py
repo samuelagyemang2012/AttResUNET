@@ -5,6 +5,7 @@ from torchvision import datasets, transforms
 from torch import nn, optim
 import torch.nn.functional as F
 from pytorch_msssim import ssim
+from torchmetrics.functional import structural_similarity_index_measure, peak_signal_noise_ratio
 from torchvision.models import vgg16
 
 import torch
@@ -65,22 +66,22 @@ class MyLoss(nn.Module):
 
     def forward(self, target, pred):
         # MSE
-        mse = F.mse_loss(target, pred)
+        mse = F.mse_loss(input=pred, target=target)
 
         # LSSIM
-        ssim_loss = 1 - ssim(target, pred, data_range=255, size_average=True)
+        ssim_loss = 1 - structural_similarity_index_measure(target=target, preds=pred, data_range=1.0)
 
         # Perceptual Loss
-        ploss_net = VGGPerceptualLoss()
-        ploss = ploss_net(target, pred)
+        # ploss_net = VGGPerceptualLoss()
+        # ploss = ploss_net(target, pred)
 
         # mse + lssim + perceptual loss
-        return mse + ssim_loss + (0.1 * ploss)
+        return mse + ssim_loss  # + (0.1 * ploss)
 
 
 def test():
-    pred = torch.randn((1, 3, 400, 400))
-    gt = torch.randn((1, 3, 400, 400))
+    pred = torch.randn((1, 3, 400, 400)).cuda()
+    gt = torch.randn((1, 3, 400, 400)).cuda()
 
     loss_net = MyLoss()
 
@@ -88,5 +89,5 @@ def test():
     print(loss)
 
 
-if __name__ == "__main__":
-    test()
+# if __name__ == "__main__":
+#     test()

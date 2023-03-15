@@ -12,6 +12,8 @@ def load_checkpoint(checkpoint, model):
     print("=> Loading checkpoint")
     model.load_state_dict(checkpoint["state_dict"])
 
+    return model
+
 
 def get_loaders(dataset, train_dir, train_dir2, val_dir, val_dir2, batch_size, train_transform, val_transform,
                 num_workers=4, pin_memory=True):

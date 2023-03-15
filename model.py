@@ -1,8 +1,10 @@
+import cv2
 import torch
 import torch.nn as nn
 import torchvision.transforms.functional as TF
-from modules.modules import DoubleConv, ResBlockIN, ConvTrans, AttentionBlock, \
-    AttentionBlockIN
+from modules.modules import DoubleConv, ResBlockIN, ConvTrans, AttentionBlock, AttentionBlockIN
+import torchvision.transforms as transforms
+import numpy as np
 
 
 class UNET(nn.Module):
@@ -119,12 +121,42 @@ class AttResUNET(nn.Module):
 
 
 def test():
-    x = torch.randn((1, 32, 32, 3))
-    x = x.permute((0, 3, 1, 2))
+    def process(arr):
+        arr = arr.permute(1, 2, 0).numpy()
+        arr = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
+
+        return arr
+
+    def show(x, arr):
+        cv2.imshow(x, arr)
+        cv2.waitKey(-1)
+
+    img_path = "C:/Users/Administrator/Desktop/datasets/SOTs/data/SOTS/train/hazy/0009.jpg"
+
+    # Transform
+    transform = transforms.Compose([transforms.ToTensor()])
+
+    # Image
+    arr = cv2.imread(img_path)
+    arr = cv2.resize(arr, (400, 400), interpolation=cv2.INTER_AREA)
+
+    print(arr)
+    show("input", arr)
+
+    # Convert the image to Torch tensor
+    tensor = transform(arr)
+    tensor = tensor.permute(0, 1, 2).unsqueeze(0)
+
+    # x = torch.randn((1, 32, 32, 3))
+    # x = x.permute((0, 3, 1, 2))
     # print(x.shape)
-    model = AttResUNET(in_channels=3, out_channels=3)
-    preds = model(x)
-    print(preds.shape)
+
+    model = UNET(in_channels=3, out_channels=3)
+    preds = model(tensor)
+
+    preds = process(preds[0].detach())
+
+    show("after", preds)
 
 
 # if __name__ == "__main__":
