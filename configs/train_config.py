@@ -16,5 +16,5 @@ RES_DIR = "res/"
 TRAIN_HAZY_DIR = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/training_data_small/train/hazy/"  # "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/train/hazy/"
 TRAIN_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/training_data_small/train/clear/"  # "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/train/clear/"
 VAL_HAZY_DIR = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/training_data_small/val/hazy/"  # "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/val/hazy/"
-VAL_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/training_data_small/val/hazy/"  # C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/val/clear/"
+VAL_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/training_data_small/val/clear/"  # C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/val/clear/"
 TOLERANCE = 30

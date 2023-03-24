@@ -20,6 +20,7 @@ from utils import load_checkpoint
 from configs import train_config as cfg
 import gc
 
+
 def init(path):
     if len(os.listdir(path)) == 0:
         name = path + "train" + str(0)

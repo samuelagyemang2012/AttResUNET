@@ -400,11 +400,11 @@ class XNet2(nn.Module):
 
         self.respath1 = Respath(256, 256)
         self.respath2 = Respath(128, 128)
-        # self.respath3 =
-        # self.respath4 =
+        self.respath3 = Respath(64, 64)
 
     def forward(self, x):
         c1 = self.conv1(x)  # [1, 64, 400, 400]
+        mr_c1 = self.respath3(c1)  # [1,64,400,400]
         c1_pool = self.pool(c1)  # [1, 64, 200, 200]
 
         c2 = self.conv2(c1_pool)  # [1, 128, 200, 200]
@@ -455,10 +455,10 @@ class XNet2(nn.Module):
 
         up14 = self.up(c13)  # [1, 128, 400, 400]
         c14 = self.conv14(up14)  # [1, 64, 400, 400]
-        # a4 = self.a3(c14, c1)  # [1, 64, 400, 400]
-        # c14 = torch.cat((c1, a4), dim=1)  # [1, 128, 400, 400]
-        # c14 = self.cat_conv3(c14)  # [1, 64, 400, 400]
-        #
+        a4 = self.a3(c14, mr_c1)  # [1, 64, 400, 400]
+        c14 = torch.cat((c1, a4), dim=1)  # [1, 128, 400, 400]
+        c14 = self.cat_conv3(c14)  # [1, 64, 400, 400]
+
         c15 = self.conv15(c14)  # [1, 3, 400, 400]
 
         return c15
