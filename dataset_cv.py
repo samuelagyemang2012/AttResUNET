@@ -10,6 +10,7 @@ import torchvision
 import torch
 import matplotlib.pyplot as plt
 import cv2
+from configs import train_config as cfg
 
 
 class Test(Dataset):
@@ -66,7 +67,7 @@ class Test(Dataset):
         return self.size
 
 
-class SOTS(Dataset):
+class Haze(Dataset):
     def __init__(self, clear_imgs_dir, hazy_imgs_dir, scale=1):
         self.clear_imgs_dir = clear_imgs_dir
         self.hazy_imgs_dir = hazy_imgs_dir
@@ -126,8 +127,8 @@ class SOTS(Dataset):
         #         clear_img.size == hazy_img.size
         # ), f"Image and mask {idx} should be the same size, but are {clear_img.size} and {hazy_img.size}"
 
-        clear_img = self.preprocess(clear_img, self.scale, 400)
-        hazy_img = self.preprocess(hazy_img, self.scale, 400)
+        clear_img = self.preprocess(clear_img, self.scale, cfg.IMAGE_WIDTH)
+        hazy_img = self.preprocess(hazy_img, self.scale, cfg.IMAGE_WIDTH)
 
         return (
             torch.from_numpy(clear_img).type(torch.FloatTensor),
@@ -160,13 +161,13 @@ def test():
         # ToTensorV2()
     ])
 
-    TRAIN_HAZY_DIR = "C:/Users/Administrator/Desktop/datasets/SOTs/data/SOTS/train/hazy/"
-    TRAIN_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/SOTs/data/SOTS/train/clear/"
+    TRAIN_HAZY_DIR = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/training_data/train/hazy/"
+    TRAIN_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/training_data/train/clear/"
 
     VAL_HAZY_DIR = "C:/Users/Administrator/Desktop/datasets/SOTs/data/SOTS/val/hazy/"
     VAL_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/SOTs/data/SOTS/val/clear/"
 
-    train_dataset = SOTS(clear_imgs_dir=TRAIN_CLEAR_DIR, hazy_imgs_dir=TRAIN_HAZY_DIR)  # , transform=train_transform)
+    train_dataset = Haze(clear_imgs_dir=TRAIN_CLEAR_DIR, hazy_imgs_dir=TRAIN_HAZY_DIR)  # , transform=train_transform)
     loader = DataLoader(dataset=train_dataset, batch_size=3, shuffle=True, num_workers=0)
 
     examples = next(iter(loader))
@@ -180,7 +181,6 @@ def test():
         print(hazy_image)
 
         show_images(hazy_image, clear_image)
-
 
 # if __name__ == "__main__":
 #     test()

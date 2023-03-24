@@ -2,55 +2,111 @@ import cv2
 import os
 import numpy as np
 from tqdm import tqdm
-
-hazy_folder_path = "D:/Datasets/SOTs/outdoor_CLAHE/hazy/"
-clahe_dest_path = "D:/Datasets/SOTs/outdoor_CLAHE/clahe_no_sharp/"
-
-
-def sharpen_image(image):
-    kernel = np.array([[-1, -1, -1],
-                       [-1, 9, -1],
-                       [-1, -1, -1]])
-
-    # image = cv2.filter2D(src=image, ddepth=-1, kernel=kernel)
-    smoothed = cv2.GaussianBlur(image, (9, 9), 10)
-    unsharped = cv2.addWeighted(image, 1.5, smoothed, -0.5, 0)
-    return unsharped
+import cv2
+import math
+import numpy as np
 
 
-def do_clahe(img):
-    lab_img = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-    l, a, b = cv2.split(lab_img)
-
-    # create CLAHE object
-    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-
-    #  apply clahe on luminosity channel
-    clahe_img = clahe.apply(l)
-
-    # merge clahe channel
-    merge_img_clahe = cv2.merge((clahe_img, a, b))
-
-    # covert final image to BGR
-    img_ = cv2.cvtColor(merge_img_clahe, cv2.COLOR_LAB2BGR)
-
-    img_ = cv2.detailEnhance(img_, sigma_s=1, sigma_r=0.15)
-    img_ = cv2.edgePreservingFilter(img_, flags=1, sigma_s=64, sigma_r=0.2)
-
-    return img_
+def DarkChannel(im, sz):
+    b, g, r = cv2.split(im)
+    dc = cv2.min(cv2.min(r, g), b);
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (sz, sz))
+    dark = cv2.erode(dc, kernel)
+    return dark
 
 
-if __name__ == "__main__":
+def AtmLight(im, dark):
+    [h, w] = im.shape[:2]
+    imsz = h * w
+    numpx = int(max(math.floor(imsz / 1000), 1))
+    darkvec = dark.reshape(imsz)
+    imvec = im.reshape(imsz, 3)
 
-    sharpen = False
+    indices = darkvec.argsort()
+    indices = indices[imsz - numpx::]
 
-    hazy_files = os.listdir(hazy_folder_path)
+    atmsum = np.zeros([1, 3])
+    for ind in range(1, numpx):
+        atmsum = atmsum + imvec[indices[ind]]
 
-    for hf in tqdm(hazy_files):
-        arr = cv2.imread(hazy_folder_path + hf)
-        if sharpen:
-            arr = sharpen_image(arr)
+    A = atmsum / numpx
+    return A
 
-        arr = do_clahe(arr)
 
-        cv2.imwrite(clahe_dest_path + hf, arr)
+def TransmissionEstimate(im, A, sz):
+    omega = 0.95
+    im3 = np.empty(im.shape, im.dtype)
+
+    for ind in range(0, 3):
+        im3[:, :, ind] = im[:, :, ind] / A[0, ind]
+
+    transmission = 1 - omega * DarkChannel(im3, sz)
+    return transmission
+
+
+def Guidedfilter(im, p, r, eps):
+    mean_I = cv2.boxFilter(im, cv2.CV_64F, (r, r))
+    mean_p = cv2.boxFilter(p, cv2.CV_64F, (r, r))
+    mean_Ip = cv2.boxFilter(im * p, cv2.CV_64F, (r, r))
+    cov_Ip = mean_Ip - mean_I * mean_p
+
+    mean_II = cv2.boxFilter(im * im, cv2.CV_64F, (r, r))
+    var_I = mean_II - mean_I * mean_I
+
+    a = cov_Ip / (var_I + eps)
+    b = mean_p - a * mean_I
+
+    mean_a = cv2.boxFilter(a, cv2.CV_64F, (r, r))
+    mean_b = cv2.boxFilter(b, cv2.CV_64F, (r, r))
+
+    q = mean_a * im + mean_b
+    return q
+
+
+def TransmissionRefine(im, et):
+    gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    gray = np.float64(gray) / 255
+    r = 60
+    eps = 0.0001
+    t = Guidedfilter(gray, et, r, eps)
+
+    return t
+
+
+def Recover(im, t, A, tx=0.1):
+    res = np.empty(im.shape, im.dtype)
+    t = cv2.max(t, tx)
+
+    for ind in range(0, 3):
+        res[:, :, ind] = (im[:, :, ind] - A[0, ind]) / t + A[0, ind]
+
+    return res
+
+
+def defog(arr):
+    I = arr.astype('float64') / 255
+    dark = DarkChannel(I, 15)
+    A = AtmLight(I, dark)
+    te = TransmissionEstimate(I, A, 15)
+    t = TransmissionRefine(src, te)
+    J = Recover(I, t, A, 0.1)
+
+    return J
+
+    # C:/Users/Administrator/Desktop/datasets/SOTs/prediction/dark_prior
+
+
+if __name__ == '__main__':
+
+    image_folder_path = "C:/Users/Administrator/Desktop/datasets/SOTs/data_dark_prior/SOTS/train/hazy/"
+    dest_path = "C:/Users/Administrator/Desktop/datasets/SOTs/data_dark_prior/SOTS/train/hazy/"
+    images = os.listdir(image_folder_path)
+
+    for i in tqdm(range(len(images))):
+        src = cv2.imread(image_folder_path + images[i])
+
+        img = defog(src)
+        img = cv2.normalize(img, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+
+        cv2.imwrite(dest_path + images[i], img)
+

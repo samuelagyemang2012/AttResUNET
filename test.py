@@ -1,331 +1,218 @@
 import os
-import collections
+import json
+import shutil
+import pandas as pd
+from tqdm import tqdm
+import numpy as np
+import random
 
-# folder_path = "D:/Datasets/SOTs/data/val/hazy/"
-# files = os.listdir(folder_path)
-# a = []
-#
-# for f in files:
-#     x = f.split("_")
-#     name = x[0]
-#
-#     new_name = name + ".jpg"
-#
-#     print(f, new_name)
-#
-#     os.rename(folder_path + f, folder_path + new_name)
+"""
+Rename files
+"""
 
-# a=[1,2,3,4]
-# x = sum(a)/len(a)
-# print(x)
 
-a = [.376039, .546535, .216607, .308726, .602373, .366117, .497894, .363372, .403762, .414478, 0.508524, 0.259040,
-     0.493261, 0.201719, 0.440309, 0.192729, 0.303523, 0.229218, 0.698494, 0.537397, 0.548040, 0.485107, 0.540936,
-     0.243098, 0.341676, 0.599637, 0.623915, 0.394550, 0.594894, 0.465448, 0.537687, 0.481759, 0.451581, 0.290351,
-     0.540788, 0.438931, 0.509315, 0.517492, 0.295717, 0.429565, 0.393647, 0.648840, 0.377697, 0.321458, 0.340645,
-     0.260063, 0.488535, 0.400830, 0.309838, 0.445320, 0.297782, 0.572879, 0.294059, 0.362873, 0.197088, 0.223003,
-     0.438628, 0.350991, 0.498749, 0.327565, 0.600013, 0.487594, 0.309343, 0.292197, 0.400178, 0.567151, 0.620432,
-     0.677984, 0.460974, 0.246147, 0.313657, 0.127696, 0.381297, 0.275309, 0.190387, 0.451506, 0.458011, 0.527419,
-     0.650107, 0.310171, 0.445990, 0.368549, 0.462185, 0.584616, 0.504585, 0.177940, 0.227007, 0.545172, 0.422856,
-     0.188806, 0.617625, 0.325988, 0.604168, 0.639422, 0.277572, 0.348257, 0.274657, 0.329612, 0.328605, 0.687938,
-     0.711105,
-     0.297982,
-     0.099620,
-     0.226075,
-     0.642215,
-     0.366456,
-     0.655788,
-     0.415242,
-     0.286725,
-     0.465639,
-     0.571555,
-     0.424177,
-     0.680547,
-     0.274094,
-     0.345748,
-     0.209212,
-     0.343923,
-     0.313117,
-     0.224832,
-     0.108061,
-     0.539084,
-     0.528162,
-     0.520585,
-     0.465732,
-     0.435177,
-     0.542083,
-     0.391358,
-     0.504014,
-     0.250903,
-     0.402188,
-     0.412669,
-     0.462444,
-     0.418906,
-     0.532864,
-     0.322779,
-     0.616457,
-     0.455301,
-     0.378009,
-     0.546178,
-     0.374674,
-     0.548123,
-     0.146834,
-     0.287242,
-     0.381690,
-     0.388929,
-     0.299226,
-     0.453216,
-     0.339028,
-     0.316629,
-     0.512778,
-     0.229586,
-     0.136149,
-     0.504489,
-     0.454543,
-     0.369661,
-     0.429635,
-     0.457677,
-     0.470315,
-     0.505155,
-     0.598925,
-     0.724704,
-     0.681131,
-     0.538933,
-     0.460288,
-     0.342020,
-     0.633678,
-     0.510148,
-     0.355433,
-     0.446556,
-     0.449219,
-     0.257781,
-     0.247180,
-     0.226880,
-     0.375003,
-     0.349531,
-     0.346165,
-     0.345664,
-     0.536565,
-     0.455667,
-     0.219387,
-     0.491024,
-     0.436931,
-     0.248958,
-     0.476788,
-     0.455135,
-     0.652603,
-     0.408146,
-     0.250984,
-     0.495433,
-     0.150469,
-     0.547947,
-     0.433427,
-     0.193948,
-     0.414856,
-     0.367767,
-     0.260601,
-     0.508639,
-     0.182308,
-     0.491677,
-     0.347821,
-     0.366909,
-     0.263790,
-     0.369367,
-     0.332403,
-     0.293231,
-     0.306423,
-     0.419289,
-     0.244307,
-     0.489638,
-     0.302085,
-     0.446491,
-     0.309728,
-     0.451747,
-     0.268584,
-     0.575091,
-     0.352832,
-     0.422527,
-     0.460146,
-     0.316180,
-     0.431685,
-     0.474202,
-     0.275559,
-     0.204322,
-     0.130871,
-     0.330987,
-     0.396810,
-     0.343582,
-     0.406341,
-     0.329918,
-     0.370755,
-     0.381366,
-     0.404808,
-     0.365225,
-     0.238644,
-     0.474106,
-     0.491581,
-     0.650241,
-     0.371039,
-     0.459938,
-     0.643228,
-     0.586437,
-     0.243206,
-     0.511266,
-     0.545052,
-     0.394546,
-     0.432202,
-     0.205825,
-     0.269789,
-     0.281195,
-     0.388823,
-     0.317812,
-     0.414944,
-     0.505700,
-     0.357376,
-     0.427233,
-     0.557163,
-     0.484624,
-     0.123491,
-     0.438542,
-     0.713986,
-     0.326062,
-     0.232788,
-     0.156340,
-     0.508868,
-     0.333763,
-     0.443540,
-     0.296727,
-     0.256901,
-     0.281353,
-     0.327193,
-     0.394407,
-     0.558628,
-     0.560219,
-     0.272388,
-     0.288240,
-     0.503009,
-     0.226406,
-     0.517240,
-     0.470682,
-     0.226761,
-     0.432538,
-     0.508867,
-     0.559954,
-     0.601336,
-     0.198837,
-     0.138188,
-     0.246512,
-     0.205412,
-     0.424294,
-     0.444567,
-     0.265729,
-     0.464313,
-     0.102148,
-     0.305522,
-     0.448716,
-     0.385632,
-     0.365434,
-     0.222941,
-     0.539915,
-     0.526027,
-     0.546464,
-     0.351712,
-     0.686607,
-     0.350126,
-     0.535240,
-     0.520479,
-     0.338829,
-     0.527895,
-     0.412748,
-     0.605440,
-     0.331086,
-     0.344575,
-     0.483693,
-     0.530964,
-     0.449745,
-     0.244859,
-     0.451213,
-     0.291789,
-     0.316986,
-     0.473476,
-     0.516105,
-     0.542683,
-     0.114215,
-     0.394789,
-     0.232130,
-     0.180401,
-     0.385965,
-     0.468577,
-     0.632446,
-     0.210398,
-     0.529012,
-     0.588343,
-     0.499998,
-     0.378341,
-     0.407548,
-     0.213364,
-     0.278510,
-     0.216774,
-     0.252319,
-     0.449075,
-     0.345424,
-     0.382943,
-     0.463578,
-     0.275689,
-     0.414375,
-     0.552497,
-     0.359278,
-     0.685607,
-     0.661814,
-     0.264605,
-     0.641808,
-     0.241519,
-     0.232195,
-     0.560200,
-     0.261697,
-     0.450154,
-     0.397700,
-     0.420574,
-     0.372535,
-     0.313859,
-     0.319653,
-     0.427307,
-     0.414765,
-     0.190861,
-     0.286230,
-     0.241946,
-     0.497151,
-     0.477009,
-     0.405437,
-     0.404744,
-     0.435829,
-     0.404687,
-     0.280231,
-     0.093499,
-     0.616662,
-     0.417557,
-     0.234398,
-     0.309812,
-     0.382206,
-     0.401884,
-     0.313399,
-     0.181020,
-     0.360270,
-     0.558203,
-     0.472966,
-     0.455114,
-     0.524143,
-     0.534019,
-     0.357810,
-     0.560318,
-     0.267038,
-     0.549233,
-     0.318004,
-     0.209044,
-     0.663436,
-     0.436516,
-     0.353321,
-     0.399757,
-     0.434259]
+def rename_files():
+    folder_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/hazy_copy/"
+    files = os.listdir(folder_path)
+    a = []
 
-pr
+    for f in files:
+        x = f.split("_")
+        name = x[0]
+        new_name = name + ".png"
+
+        os.rename(folder_path + f, folder_path + new_name)
+
+
+def get_foggy_images_bdd():
+    files = []
+    json_path = "F:/datasets/bdd100k_labels_release/bdd100k/labels/bdd100k_labels_images_train.json"
+    f = open(json_path, )
+    data = json.load(f)
+
+    print("data loaded")
+    for d in data:
+        name = d["name"]
+        weather = d["attributes"]["weather"]
+        time = d["attributes"]["timeofday"]
+        labels = d["labels"]
+
+        if weather == "foggy" and time == "daytime":
+            for ll in labels:
+                try:
+                    cat = ll['category']
+                    box = ll['box2d']
+                    x1 = box['x1']
+                    y1 = box['y1']
+                    x2 = box['x2']
+                    y2 = box['y2']
+
+                    files.append([name, cat, x1, y1, x2, y2])
+                except:
+                    pass
+
+    # Closing file
+    f.close()
+
+    label_map = {"traffic sign": 0,
+                 "car": 1,
+                 "person": 2,
+                 "traffic light": 3,
+                 "rider": 4,
+                 "bike": 5,
+                 "bus": 6,
+                 "truck": 7,
+                 "motor": 8,
+                 "train": 9
+                 }
+
+    df = pd.DataFrame(files, columns=["file", "category", "x1", "y1", "x2", "y2"], index=None)
+    df["id"] = df["category"]
+    df["id"] = df["id"].map(label_map)
+
+    df.to_csv("foggy_scenes.csv")
+
+
+def move_foggy_images_bdd():
+    csv_file = "foggy_scenes.csv"
+    images_path = "F:/datasets/bdd100k_images_100k/bdd100k/images/100k/train/"
+    iter = os.scandir(images_path)
+
+    images = []
+    for entry in iter:
+        if entry.is_file():
+            images.append(entry.name)
+
+    c = 0
+    #
+    print("csv loaded")
+    df = pd.read_csv(csv_file)
+    files = df.file.to_list()
+
+    for f in files:
+        if f in images:
+            pass
+            # print(images_path + f)
+            # print("./det/" + f)
+            # shutil.copy(images_path + f, "./det/images/" + f)
+    # print(c)
+
+
+def assert_data():
+    csv_path = "foggy_scenes.csv"
+    det_images_path = "./det/images/"
+
+    df = pd.read_csv(csv_path)
+    det_images = os.listdir(det_images_path)
+
+    assert len(df["file"].unique()) == len(det_images)
+    print("same length: {}, {}".format(len(det_images), len(df["file"].unique())))
+
+
+def write(data, path):
+    f = open(path, "w")
+    f.write(data)
+    f.close()
+
+
+def to_yolo(w_, h_, box):
+    dw = 1. / float(w_)
+    dh = 1. / float(h_)
+    ll = box[4].astype(int)
+    x = (box[0] + box[1]) / 2.0 - 1
+    y = (box[2] + box[3]) / 2.0 - 1
+    w = box[1] - box[0]
+    h = box[3] - box[2]
+    x = round(x * dw, 4)
+    w = round(w * dw, 4)
+    y = round(y * dh, 4)
+    h = round(h * dh, 4)
+    # print(type(ll))
+    return ll.astype(str), x.astype(str), y.astype(str), w.astype(str), h.astype(str)
+
+
+def get_labels():
+    csv_path = "foggy_scenes.csv"
+    w, h = (1280, 720)
+
+    df = pd.read_csv(csv_path, )
+
+    images = df["file"].unique()
+
+    for i in tqdm(images):
+        data = df[df["file"] == i]
+        x = data.to_numpy()
+        string = ""
+
+        for d in x:
+            id, x1, y1, x2, y2 = d[6], d[2], d[3], d[4], d[5]
+            new_box = np.array([x1, x2, y1, y2, id])
+            id, x, y, w_, h_ = to_yolo(w, h, new_box)
+
+            string += "{} {} {} {} {}".format(id, x, y, w_, h_) + "/n"
+        write(string, "./det/anns/" + str(i) + ".txt")
+
+
+def its():
+    hazy_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/hazy/"
+    dest_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/hazy_copy/"
+
+    hazy_files = os.listdir(hazy_path)
+
+    for hf in tqdm(hazy_files):
+        arr = hf.split("_")
+        c = arr[1]
+
+        if c == "10":
+            shutil.copy(hazy_path + hf, dest_path + hf)
+            # print(new_name)
+
+
+def split():
+    images_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/hazy_copy/"
+
+    train_clear_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/training_data/train/clear/"
+    train_hazy_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/training_data/train/hazy/"
+
+    val_clear_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/training_data/val/clear/"
+    val_hazy_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/training_data/val/hazy/"
+
+    source_clear_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/clear/"
+    source_hazy_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/hazy_copy/"
+
+    images = os.listdir(images_path)
+    data = []
+
+    for i in images:
+        data.append(i)
+
+    random.shuffle(data)
+
+    train_split = int(len(data) * 0.8)
+
+    train_data = data[0:train_split]
+    val_data = data[train_split:]
+
+    for td in train_data:
+        cl = train_clear_path + td
+        shutil.copy(source_clear_path + td, cl)
+
+        hz = train_hazy_path + td
+        shutil.copy(source_hazy_path + td, hz)
+
+    for vd in val_data:
+        cl = val_clear_path + vd
+        shutil.copy(source_clear_path + vd, cl)
+
+        hz = val_hazy_path + vd
+        shutil.copy(source_hazy_path + vd, hz)
+
+
+# if __name__ == "__main__":
+#     split()
+    # rename_files()
+    # get_labels()
+    # get_foggy_images_bdd()
+    # move_foggy_images_bdd()
+    # assert_data()
+    # its()

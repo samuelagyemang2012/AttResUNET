@@ -6,20 +6,47 @@ from torch import nn, optim
 import torch.nn.functional as F
 from pytorch_msssim import ssim
 from torchmetrics.functional import structural_similarity_index_measure, peak_signal_noise_ratio
-from torchvision.models import vgg16
-
+from torchvision.models import vgg16, vgg19
 import torch
 import torchvision
 
 
-class VGGPerceptualLoss(torch.nn.Module):
+class PerceptualLoss(nn.Module):
+    def __init__(self, vgg_model):
+        super(PerceptualLoss, self).__init__()
+        self.vgg_layers = vgg_model
+        self.layer_name_mapping = {
+            '3': "relu1_2",
+            '8': "relu2_2",
+            '15': "relu3_3"
+        }
+
+    def output_features(self, x):
+        output = {}
+        for name, module in self.vgg_layers._modules.items():
+            x = module(x)
+            if name in self.layer_name_mapping:
+                output[self.layer_name_mapping[name]] = x
+        return list(output.values())
+
+    def forward(self, dehaze, gt):
+        loss = []
+        dehaze_features = self.output_features(dehaze)
+        gt_features = self.output_features(gt)
+        for dehaze_feature, gt_feature in zip(dehaze_features, gt_features):
+            loss.append(F.mse_loss(dehaze_feature, gt_feature))
+
+        return sum(loss) / len(loss)
+
+
+class VGGPerceptualLoss(nn.Module):
     def __init__(self, resize=True):
         super(VGGPerceptualLoss, self).__init__()
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        blocks = [torchvision.models.vgg16(pretrained=True).features[:4].eval(),
-                  torchvision.models.vgg16(pretrained=True).features[4:9].eval(),
-                  torchvision.models.vgg16(pretrained=True).features[9:16].eval(),
-                  torchvision.models.vgg16(pretrained=True).features[16:23].eval()]
+        blocks = [torchvision.models.vgg16(weights='VGG16_Weights.DEFAULT').features[:4].eval(),
+                  torchvision.models.vgg16(weights='VGG16_Weights.DEFAULT').features[4:9].eval(),
+                  torchvision.models.vgg16(weights='VGG16_Weights.DEFAULT').features[9:16].eval(),
+                  torchvision.models.vgg16(weights='VGG16_Weights.DEFAULT').features[16:23].eval()]
         for bl in blocks:
             for p in bl.parameters():
                 p.requires_grad = False
@@ -56,10 +83,38 @@ class VGGPerceptualLoss(torch.nn.Module):
         return loss
 
 
+class VGGLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.vgg = vgg19(pretrained=True).features[:35].eval().to(self.device)
+
+        for param in self.vgg.parameters():
+            param.requires_grad = False
+
+        self.loss = nn.MSELoss()
+
+    def forward(self, pred, target):
+        vgg_input_features = self.vgg(pred)
+        vgg_target_features = self.vgg(target)
+        return self.loss(vgg_input_features, vgg_target_features)
+
+
 class MyLoss(nn.Module):
 
     def __init__(self):
         super(MyLoss, self).__init__()
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.vgg19loss = VGGLoss()
+        self.vgg16loss = VGGPerceptualLoss()
+
+        # self.vgg_model = vgg16(weights="VGG16_Weights.DEFAULT").features[:16]
+        # self.vgg_model = self.vgg_model.to(self.device)
+        # for param in self.vgg_model.parameters():
+        #     param.requires_grad = False
+
+        # self.ploss = VGGPerceptualLoss()
+        # self.ploss = PerceptualLoss(self.vgg_model)
 
         # pred: model output
         # target: ground-truth
@@ -72,11 +127,10 @@ class MyLoss(nn.Module):
         ssim_loss = 1 - structural_similarity_index_measure(target=target, preds=pred, data_range=1.0)
 
         # Perceptual Loss
-        # ploss_net = VGGPerceptualLoss()
-        # ploss = ploss_net(target, pred)
+        pl = self.vgg16loss(pred, target)
 
         # mse + lssim + perceptual loss
-        return mse + ssim_loss  # + (0.1 * ploss)
+        return mse + ssim_loss + (0.1 * pl)
 
 
 def test():
@@ -87,7 +141,6 @@ def test():
 
     loss = loss_net(gt, pred)
     print(loss)
-
 
 # if __name__ == "__main__":
 #     test()
