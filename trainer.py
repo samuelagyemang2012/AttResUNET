@@ -114,7 +114,7 @@ def train():
         # net = AttResUNET(in_channels=3, out_channels=3).to(cfg.DEVICE)
         # net = R2AttUNet(in_channels=3, out_channels=3, t=1).to(cfg.DEVICE)
         # net = XNet(in_channels=3, out_channels=3).to(cfg.DEVICE)
-        net = XNet2(in_channels=3, out_channels=3).to(cfg.DEVICE)
+        net = XNet2(in_channels=3, out_channels=3, respath_len=1).to(cfg.DEVICE)
     else:
         print("loading checkpoint")
         weights_path = "res/train4/best_dehaze_mse_lssim_ploss2_no_clahe_checkpoint.pth.tar"
@@ -151,9 +151,10 @@ def train():
             img_haze = img_haze.to(cfg.DEVICE)
 
             # do prediction
+            # with torch.cuda.amp.autocast():
             clean_image = net.forward(img_haze)
-
             train_loss = criterion(img_clear, clean_image)
+
             train_ssim = structural_similarity_index_measure(target=img_clear, preds=clean_image, data_range=1.0)
             train_psnr = peak_signal_noise_ratio(target=img_clear, preds=clean_image)
 
@@ -174,9 +175,10 @@ def train():
             img_clear = img_clear.to(cfg.DEVICE)
             img_haze = img_haze.to(cfg.DEVICE)
 
+            # with torch.cuda.amp.autocast():
             clean_image = net.forward(img_haze)
-
             val_loss = criterion(img_clear, clean_image)
+
             val_ssim = structural_similarity_index_measure(target=img_clear, preds=clean_image, data_range=1.0)
             val_psnr = peak_signal_noise_ratio(target=img_clear, preds=clean_image)
 
@@ -185,8 +187,8 @@ def train():
             val_step_psnr.append(val_psnr.cpu().detach().item())
 
         # save image at interval
-        if epoch % cfg.INTERVAL == 0:
-            save_img(clean_image, "test/dehaze_" + str(epoch) + ".jpg", )
+        # if epoch % cfg.INTERVAL == 0:
+        #     save_img(clean_image, "test/dehaze_" + str(epoch) + ".jpg", )
 
         # save information
         train_epoch_loss.append(sum(train_step_loss) / len(train_step_loss))

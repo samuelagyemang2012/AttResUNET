@@ -18,3 +18,9 @@ TRAIN_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/tra
 VAL_HAZY_DIR = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/training_data_small/val/hazy/"  # "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/val/hazy/"
 VAL_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/training_data_small/val/clear/"  # C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/val/clear/"
 TOLERANCE = 30
+
+# colab
+# "/content/drive/MyDrive/ML_Data/datasets/images/ITS/train/hazy/"
+# "/content/drive/MyDrive/ML_Data/datasets/images/ITS/train/clear/"
+# "/content/drive/MyDrive/ML_Data/datasets/images/ITS/val/hazy/"
+# "/content/drive/MyDrive/ML_Data/datasets/images/ITS/val/clear/"

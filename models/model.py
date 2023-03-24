@@ -364,8 +364,10 @@ class XNet(nn.Module):
 
 
 class XNet2(nn.Module):
-    def __init__(self, in_channels=3, out_channels=3):
+    def __init__(self, in_channels=3, out_channels=3, respath_len=2):
         super(XNet2, self).__init__()
+        self.respath_len = respath_len
+
         self.pool = nn.MaxPool2d(2, 2)
         self.up = nn.Upsample(scale_factor=2, mode='nearest')
         # self.up = ConvTrans()
@@ -398,13 +400,13 @@ class XNet2(nn.Module):
         self.cat_conv2 = ResBlockIN(256, 128)  # DoubleConv(256, 128)
         self.cat_conv3 = ResBlockIN(128, 64)  # DoubleConv(128, 64)
 
-        self.respath1 = Respath(256, 256)
-        self.respath2 = Respath(128, 128)
-        self.respath3 = Respath(64, 64)
+        self.respath1 = Respath(256, 256, self.respath_len)
+        self.respath2 = Respath(128, 128, self.respath_len)
+        # self.respath3 = Respath(64, 64,2)
 
     def forward(self, x):
         c1 = self.conv1(x)  # [1, 64, 400, 400]
-        mr_c1 = self.respath3(c1)  # [1,64,400,400]
+        # mr_c1 = self.respath3(c1)  # [1,64,400,400]
         c1_pool = self.pool(c1)  # [1, 64, 200, 200]
 
         c2 = self.conv2(c1_pool)  # [1, 128, 200, 200]
@@ -455,9 +457,10 @@ class XNet2(nn.Module):
 
         up14 = self.up(c13)  # [1, 128, 400, 400]
         c14 = self.conv14(up14)  # [1, 64, 400, 400]
-        a4 = self.a3(c14, mr_c1)  # [1, 64, 400, 400]
-        c14 = torch.cat((c1, a4), dim=1)  # [1, 128, 400, 400]
-        c14 = self.cat_conv3(c14)  # [1, 64, 400, 400]
+
+        # a4 = self.a3(c14, mr_c1)  # [1, 64, 400, 400]
+        # c14 = torch.cat((c1, c14), dim=1)  # [1, 128, 400, 400]
+        # c14 = self.cat_conv3(c14)  # [1, 64, 400, 400]
 
         c15 = self.conv15(c14)  # [1, 3, 400, 400]
 

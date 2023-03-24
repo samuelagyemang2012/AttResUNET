@@ -6,14 +6,14 @@ import torchvision.transforms as transforms
 import cv2
 
 # load model
-weights_path = "res/train0/best_ploss2_xnet_checkpoint.pth.tar"
+weights_path = "C:/Users/Administrator/Desktop/dehaze/res/xnet_no_final_con_its_bs_1/best_ploss2_xnet_no_fs_checkpoint.pth.tar"
 
 net = XNet2()  # AttResUNET() #XNet()  # AttResUNET2()
 weights = torch.load(weights_path)
 net = load_checkpoint(weights, net)
 
-img_clear_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/val/clear/1881.png"  # "C:/Users/Administrator/Downloads/HSTS/real-world/NW_Google_837.jpeg"  # "C:/Users/Administrator/Desktop/datasets/SOTs/data_no_clahe/SOTS/val/clear/1919.png"
-img_hazy_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/val/hazy/1881.jpg"  # "C:/Users/Administrator/Downloads/HSTS/real-world/NW_Google_837.jpeg"
+img_clear_path = "./test/0469.jpg" #"C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/val/clear/1917.png"  # "C:/Users/Administrator/Downloads/HSTS/real-world/NW_Google_837.jpeg"  # "C:/Users/Administrator/Desktop/datasets/SOTs/data_no_clahe/SOTS/val/clear/1919.png"
+img_hazy_path ="./test/0469.jpg" #"C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/val/hazy/1917.jpg"  # "C:/Users/Administrator/Downloads/HSTS/real-world/NW_Google_837.jpeg"
 
 transform = transforms.Compose([
     transforms.Resize((400, 400)),

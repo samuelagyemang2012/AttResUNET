@@ -389,7 +389,7 @@ class Respath(torch.nn.Module):
 
     '''
 
-    def __init__(self, num_in_filters, num_out_filters, respath_length=1):
+    def __init__(self, num_in_filters, num_out_filters, respath_length=2):
 
         super().__init__()
 
