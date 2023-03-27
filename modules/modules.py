@@ -78,7 +78,7 @@ class ResBlockIN(nn.Module):
             nn.Conv2d(out_channels, out_channels, 3, 1, 1, bias=False),
             nn.InstanceNorm2d(out_channels),
             nn.LeakyReLU(inplace=True),
-            # nn.Dropout(0.5)
+            nn.Dropout(0.2)
         )
 
     def forward(self, x):
@@ -108,6 +108,68 @@ class ResBlockIN2(nn.Module):
     def forward(self, x):
         x = self.conv(x) + self.skip(x)
         x = nn.LeakyReLU(0.2, inplace=True)(x)
+        return x
+
+
+class ResBlockM(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, padding_mode='zeros', dilation=1,
+                 use_batch=False,
+                 dropout=0.5, with_affine=True):
+        super(ResBlockM, self).__init__()
+
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.use_batch = use_batch
+        self.dilation = dilation
+        self.dropout = dropout
+        self.affine = with_affine
+        self.padding_mode = padding_mode
+
+        self.skip1 = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, self.kernel_size, self.stride, self.padding, bias=False,
+                      dilation=self.dilation, padding_mode=self.padding_mode),
+            nn.InstanceNorm2d(out_channels, affine=self.affine)
+        )
+
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, self.kernel_size, self.stride, self.padding, bias=False,
+                      dilation=self.dilation, padding_mode=self.padding_mode),
+            nn.InstanceNorm2d(out_channels, affine=self.affine),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(out_channels, out_channels, self.kernel_size, self.stride, self.padding, bias=False,
+                      dilation=self.dilation, padding_mode=self.padding_mode),
+            nn.InstanceNorm2d(out_channels, affine=self.affine),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(self.dropout)
+        )
+
+        self.skip2 = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, self.kernel_size, self.stride, self.padding, bias=False,
+                      dilation=self.dilation, padding_mode=self.padding_mode),
+            nn.BatchNorm2d(out_channels)
+        )
+
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, self.kernel_size, self.stride, self.padding, bias=False,
+                      dilation=self.dilation, padding_mode=self.padding_mode),
+            nn.BatchNorm2d(out_channels),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(out_channels, out_channels, self.kernel_size, self.stride, self.padding, bias=False,
+                      dilation=self.dilation, padding_mode=self.padding_mode),
+            nn.BatchNorm2d(out_channels),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(self.dropout)
+        )
+
+    def forward(self, x):
+        if self.use_batch:
+            x = self.conv2(x) + self.skip2(x)
+            x = nn.LeakyReLU(0.2, inplace=True)(x)
+        else:
+            x = self.conv1(x) + self.skip1(x)
+            x = nn.LeakyReLU(0.2, inplace=True)(x)
+
         return x
 
 
@@ -168,6 +230,35 @@ class ConvTrans2(nn.Module):
 
     def forward(self, x):
         x = self.up(x)
+        return x
+
+
+class ConvTransM(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, dilation=1, use_batch=False):
+        super(ConvTransM, self).__init__()
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.use_batch = use_batch
+        self.dilation = dilation
+
+        self.up1 = nn.Sequential(
+            nn.ConvTranspose2d(in_channels, out_channels, self.kernel_size, self.stride, self.padding),
+            nn.InstanceNorm2d(out_channels, affine=True),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+
+        self.up2 = nn.Sequential(
+            nn.ConvTranspose2d(in_channels, out_channels, self.kernel_size, self.stride, self.padding),
+            nn.BatchNorm2d(out_channels),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+
+    def forward(self, x):
+        if self.use_batch:
+            x = self.up2(x)
+        else:
+            x = self.up1(x)
         return x
 
 
@@ -259,46 +350,6 @@ class AttentionBlockIN2(nn.Module):
         psi = self.psi(psi)
 
         return x * psi
-
-
-class RecurrentBlock(nn.Module):
-    def __init__(self, out_channels, t=2):
-        super(RecurrentBlock, self).__init__()
-        self.t = t
-        self.ch_out = out_channels
-        self.conv = nn.Sequential(
-            nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Dropout(0.2)
-            # nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=True),
-            # nn.BatchNorm2d(out_channels),
-            # nn.ReLU(inplace=True)
-        )
-
-    def forward(self, x):
-        for i in range(self.t):
-
-            if i == 0:
-                x1 = self.conv(x)
-
-            x1 = self.conv(x + x1)
-        return x1
-
-
-class RRCNNBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, t=2):
-        super(RRCNNBlock, self).__init__()
-        self.RCNN = nn.Sequential(
-            RecurrentBlock(out_channels, t=t),
-            RecurrentBlock(out_channels, t=t)
-        )
-        self.Conv_1x1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0)
-
-    def forward(self, x):
-        x = self.Conv_1x1(x)
-        x1 = self.RCNN(x)
-        return x + x1
 
 
 class Conv2d_batchnorm(torch.nn.Module):

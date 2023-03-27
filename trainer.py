@@ -7,11 +7,12 @@ from tqdm import tqdm
 from albumentations.pytorch import ToTensorV2
 from torch.utils.data import DataLoader
 import albumentations as A
-from models.model import AttResUNET, XNet, AttResUNET2, XNet2
+from models.model import XNet, XNet2, Network5
 from dataset_cv import Haze
 from early_stopping import EarlyStopping
 from model_checkpoint import ModelCheckpoint
 from lion_pytorch import Lion
+from torch.optim import Adam
 from loss import MyLoss
 import cv2
 from utils import save_checkpoint
@@ -109,19 +110,20 @@ def train():
 
     info = []
 
+    model_name = "ploss_vgg19_xnet2_checkpoint.pth.tar"
+
     if not cfg.LOAD_MODEL:
         print("creating model")
-        # net = AttResUNET(in_channels=3, out_channels=3).to(cfg.DEVICE)
-        # net = R2AttUNet(in_channels=3, out_channels=3, t=1).to(cfg.DEVICE)
-        # net = XNet(in_channels=3, out_channels=3).to(cfg.DEVICE)
-        net = XNet2(in_channels=3, out_channels=3, respath_len=1).to(cfg.DEVICE)
-    else:
-        print("loading checkpoint")
-        weights_path = "res/train4/best_dehaze_mse_lssim_ploss2_no_clahe_checkpoint.pth.tar"
-        net = AttResUNET()
-        weights = torch.load(weights_path)
-        net = load_checkpoint(weights, net)
-        net = net.to(cfg.DEVICE)
+
+        net = XNet2(in_channels=3, out_channels=3).to(cfg.DEVICE)
+    # else:
+    #     pass
+    # print("loading checkpoint")
+    # weights_path = "res/train0/best_dehaze_mse_lssim_ploss2_no_clahe_checkpoint.pth.tar"
+    # net = AttResUNET()
+    # weights = torch.load(weights_path)
+    # net = load_checkpoint(weights, net)
+    # net = net.to(cfg.DEVICE)
 
     print("preparing data")
     train_dataset = Haze(clear_imgs_dir=cfg.TRAIN_CLEAR_DIR, hazy_imgs_dir=cfg.TRAIN_HAZY_DIR)
@@ -133,7 +135,10 @@ def train():
 
     print("setting criterion and opt")
     criterion = MyLoss().to(cfg.DEVICE)
-    optimizer = Lion(net.parameters(), lr=cfg.LEARNING_RATE, weight_decay=cfg.WEIGHT_DECAY)
+    lion_opt = Lion(net.parameters(), lr=cfg.LEARNING_RATE, weight_decay=cfg.WEIGHT_DECAY)
+    adam_opt = Adam(net.parameters(), lr=cfg.LEARNING_RATE, betas=cfg.ADAM_BETAS)
+
+    optimizers = [lion_opt, adam_opt]
 
     print("setting callbacks")
     early_stopping = EarlyStopping(tolerance=cfg.TOLERANCE, metric="accuracy")
@@ -158,9 +163,9 @@ def train():
             train_ssim = structural_similarity_index_measure(target=img_clear, preds=clean_image, data_range=1.0)
             train_psnr = peak_signal_noise_ratio(target=img_clear, preds=clean_image)
 
-            optimizer.zero_grad()
+            optimizers[1].zero_grad()
             train_loss.backward()
-            optimizer.step()
+            optimizers[1].step()
             # torch.nn.utils.clip_grad_norm(net.parameters(), 0.1)
 
             train_step_loss.append(train_loss.cpu().detach().item())
@@ -187,8 +192,8 @@ def train():
             val_step_psnr.append(val_psnr.cpu().detach().item())
 
         # save image at interval
-        # if epoch % cfg.INTERVAL == 0:
-        #     save_img(clean_image, "test/dehaze_" + str(epoch) + ".jpg", )
+        if epoch % cfg.INTERVAL == 0:
+            save_img(clean_image, "test/dehaze_" + str(epoch) + ".jpg", )
 
         # save information
         train_epoch_loss.append(sum(train_step_loss) / len(train_step_loss))
@@ -208,30 +213,29 @@ def train():
                      val_epoch_psnr[epoch]])
 
         # log information
-        print(
-            'Epoch: {}/{} | Train Loss: {:.6f} | Train SSIM: {:.6f} | Train PSNR: {:.6f} | Val Loss: {:.6f} | Val '
-            'SSIM: {:.6f} | Val PSNR: {:.6f} '.format(epoch + 1, cfg.NUM_EPOCHS,
-                                                      train_epoch_loss[epoch],
-                                                      train_epoch_ssim[epoch],
-                                                      train_epoch_psnr[epoch],
-                                                      val_epoch_loss[epoch],
-                                                      val_epoch_ssim[epoch],
-                                                      val_epoch_psnr[epoch]
-                                                      ))
+        print('Epoch: {}/{} | Train Loss: {:.6f} | Train SSIM: {:.6f} | Train PSNR: {:.6f} | Val Loss: {:.6f} | Val '
+              'SSIM: {:.6f} | Val PSNR: {:.6f} '.format(epoch + 1, cfg.NUM_EPOCHS,
+                                                        train_epoch_loss[epoch],
+                                                        train_epoch_ssim[epoch],
+                                                        train_epoch_psnr[epoch],
+                                                        val_epoch_loss[epoch],
+                                                        val_epoch_ssim[epoch],
+                                                        val_epoch_psnr[epoch]
+                                                        ))
 
         save_results(info, save_path + "/results.csv")
 
         # model checkpoint
         if model_checkpoint(val_epoch_psnr[epoch]):
-            name = save_path + "/best_ploss2_xnet_checkpoint.pth.tar"
+            name = save_path + "/best_" + model_name
             print("Val psnr improved from {:.4f} to {:.4f}".format(model_checkpoint.get_last_best(),
                                                                    val_epoch_psnr[epoch]))
-            save_model(net, optimizer, name)
+            save_model(net, optimizers[1], name)
 
         # early stopping
         if early_stopping(val_epoch_psnr[epoch]):
-            name = save_path + "/last_ploss2_xnet_checkpoint.pth.tar"
-            save_model(net, optimizer, name)
+            name = save_path + "/last_" + model_name
+            save_model(net, optimizers[1], name)
 
             print("Early Stopping on epoch {}".format(epoch + 1))
             break

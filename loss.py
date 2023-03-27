@@ -127,7 +127,7 @@ class MyLoss(nn.Module):
         ssim_loss = 1 - structural_similarity_index_measure(target=target, preds=pred, data_range=1.0)
 
         # Perceptual Loss
-        pl = self.vgg16loss(pred, target)
+        pl = self.vgg19loss(pred, target)
 
         # mse + lssim + perceptual loss
         return mse + ssim_loss + (0.1 * pl)

@@ -23,8 +23,8 @@ def get_psnr(image1, image2, max_value=255):
     return 20 * np.log10(max_value / (np.sqrt(mse)))
 
 
-clear_images_path = "C:/Users/Administrator/Desktop/datasets/SOTs/indoor/clear/"
-preds_images_path = "C:/Users/Administrator/Desktop/datasets/SOTs/indoor/preds_with_lr_02/"
+clear_images_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/outdoor/tt/"
+preds_images_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/outdoor/preds_xnet_rp_2/"
 w, h = 400, 400
 clear_images = os.listdir(clear_images_path)
 preds_images = os.listdir(preds_images_path)

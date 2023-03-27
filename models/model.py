@@ -2,8 +2,9 @@ import cv2
 import torch
 import torch.nn as nn
 import torchvision.transforms.functional as TF
+import torch.nn.functional as F
 from modules.modules import DoubleConv, ResBlockIN, ResBlockIN2, ConvTrans, ConvTrans2, AttentionBlock, \
-    AttentionBlockIN, AttentionBlockIN2, RRCNNBlock, UpConv, Respath
+    AttentionBlockIN, AttentionBlockIN2, ResBlockM, ConvTransM, UpConv, Respath
 import torchvision.transforms as transforms
 import numpy as np
 
@@ -194,113 +195,49 @@ class AttResUNET2(nn.Module):
         return d1
 
 
-class R2AttUNet(nn.Module):
-    def __init__(self, in_channels=3, out_channels=3, t=2):
-        super(R2AttUNet, self).__init__()
-
-        self.Maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.Upsample = nn.Upsample(scale_factor=2)
-
-        self.RRCNN1 = RRCNNBlock(in_channels=in_channels, out_channels=64, t=t)
-
-        self.RRCNN2 = RRCNNBlock(in_channels=64, out_channels=128, t=t)
-
-        self.RRCNN3 = RRCNNBlock(in_channels=128, out_channels=256, t=t)
-
-        self.RRCNN4 = RRCNNBlock(in_channels=256, out_channels=512, t=t)
-
-        self.RRCNN5 = RRCNNBlock(in_channels=512, out_channels=1024, t=t)
-
-        self.Up5 = UpConv(in_channels=1024, out_channels=512)
-        self.Att5 = AttentionBlock(F_g=512, F_l=512, F_int=256)
-        self.Up_RRCNN5 = RRCNNBlock(in_channels=1024, out_channels=512, t=t)
-
-        self.Up4 = UpConv(in_channels=512, out_channels=256)
-        self.Att4 = AttentionBlock(F_g=256, F_l=256, F_int=128)
-        self.Up_RRCNN4 = RRCNNBlock(in_channels=512, out_channels=256, t=t)
-
-        self.Up3 = UpConv(in_channels=256, out_channels=128)
-        self.Att3 = AttentionBlock(F_g=128, F_l=128, F_int=64)
-        self.Up_RRCNN3 = RRCNNBlock(in_channels=256, out_channels=128, t=t)
-
-        self.Up2 = UpConv(in_channels=128, out_channels=64)
-        self.Att2 = AttentionBlock(F_g=64, F_l=64, F_int=32)
-        self.Up_RRCNN2 = RRCNNBlock(in_channels=128, out_channels=64, t=t)
-
-        self.Conv_1x1 = nn.Conv2d(64, out_channels, kernel_size=1, stride=1, padding=0)
-
-    def forward(self, x):
-        # encoding path
-        x1 = self.RRCNN1(x)
-
-        x2 = self.Maxpool(x1)
-        x2 = self.RRCNN2(x2)
-
-        x3 = self.Maxpool(x2)
-        x3 = self.RRCNN3(x3)
-
-        x4 = self.Maxpool(x3)
-        x4 = self.RRCNN4(x4)
-
-        x5 = self.Maxpool(x4)
-        x5 = self.RRCNN5(x5)
-
-        # decoding + concat path
-        d5 = self.Up5(x5)
-        x4 = self.Att5(g=d5, x=x4)
-        d5 = torch.cat((x4, d5), dim=1)
-        d5 = self.Up_RRCNN5(d5)
-
-        d4 = self.Up4(d5)
-        x3 = self.Att4(g=d4, x=x3)
-        d4 = torch.cat((x3, d4), dim=1)
-        d4 = self.Up_RRCNN4(d4)
-
-        d3 = self.Up3(d4)
-        x2 = self.Att3(g=d3, x=x2)
-        d3 = torch.cat((x2, d3), dim=1)
-        d3 = self.Up_RRCNN3(d3)
-
-        d2 = self.Up2(d3)
-        x1 = self.Att2(g=d2, x=x1)
-        d2 = torch.cat((x1, d2), dim=1)
-        d2 = self.Up_RRCNN2(d2)
-
-        d1 = self.Conv_1x1(d2)
-
-        return d1
-
-
 class XNet(nn.Module):
-    def __init__(self, in_channels=3, out_channels=3):
+    def __init__(self, in_channels=3, out_channels=3, dropout=0.2, affine=False, use_batch=False):
         super(XNet, self).__init__()
         self.pool = nn.MaxPool2d(2, 2)
-        self.up = nn.Upsample(scale_factor=2, mode='nearest')
-        # self.up = ConvTrans()
+        self.up = nn.Upsample(scale_factor=2, mode='bilinear')
 
-        self.conv1 = ResBlockIN(in_channels, 64)  # DoubleConv(in_channels, 64)
-        self.conv2 = ResBlockIN(64, 128)  # DoubleConv(64, 128)
-        self.conv3 = ResBlockIN(128, 256)  # DoubleConv(128, 256)
+        self.conv1 = ResBlockM(in_channels, 64, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch, padding_mode='reflect')
+        self.conv2 = ResBlockM(64, 128, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch)
+        self.conv3 = ResBlockM(128, 256, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch)
 
-        self.conv4 = ResBlockIN(256, 512)  # DoubleConv(256, 512)
-        self.conv5 = ResBlockIN(512, 512)  # DoubleConv(512, 512)
+        self.conv4 = ResBlockM(256, 512, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch)
+        self.conv5 = ResBlockM(512, 512, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch)
 
-        self.conv6 = ResBlockIN(512, 256)  # DoubleConv(512, 256)
-        self.conv7 = ResBlockIN(256, 128)  # DoubleConv(256, 128)
+        self.conv6 = ResBlockM(512, 256, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch)
+        self.conv7 = ResBlockM(256, 128, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch)
 
-        self.conv8 = ResBlockIN(128, 128)  # DoubleConv(128, 128)
-        self.conv9 = ResBlockIN(128, 256)  # DoubleConv(128, 256)
-        self.conv10 = ResBlockIN(256, 512)  # DoubleConv(256, 512)
-        self.conv11 = ResBlockIN(512, 512)  # DoubleConv(512, 512)
-        self.conv12 = ResBlockIN(512, 256)  # DoubleConv(512, 256)
-        self.conv13 = ResBlockIN(256, 128)  # DoubleConv(256, 128)
-        self.conv14 = ResBlockIN(128, 64)  # DoubleConv(128, 64)
+        self.conv8 = ResBlockM(128, 128, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch)
+        self.conv9 = ResBlockM(128, 256, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch)
+        self.conv10 = ResBlockM(256, 512, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                                use_batch=use_batch)
+        self.conv11 = ResBlockM(512, 512, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                                use_batch=use_batch)
+        self.conv12 = ResBlockM(512, 256, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                                use_batch=use_batch)
+        self.conv13 = ResBlockM(256, 128, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                                use_batch=use_batch)
+        self.conv14 = ResBlockM(128, 64, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                                use_batch=use_batch)
 
         self.conv15 = nn.Conv2d(64, out_channels, kernel_size=(1, 1), stride=(1, 1), padding=0)
 
         self.a1 = AttentionBlockIN(256, 256, 128)
         self.a2 = AttentionBlockIN(128, 128, 64)
-        self.a3 = AttentionBlockIN(64, 64, 64)
+        self.a3 = AttentionBlockIN(64, 64, 32)
 
         self.cat_conv1 = ResBlockIN(512, 256)  # DoubleConv(512, 256)
         self.cat_conv2 = ResBlockIN(256, 128)  # DoubleConv(256, 128)
@@ -364,12 +301,12 @@ class XNet(nn.Module):
 
 
 class XNet2(nn.Module):
-    def __init__(self, in_channels=3, out_channels=3, respath_len=2):
+    def __init__(self, in_channels=3, out_channels=3, respath_len=1):
         super(XNet2, self).__init__()
         self.respath_len = respath_len
 
         self.pool = nn.MaxPool2d(2, 2)
-        self.up = nn.Upsample(scale_factor=2, mode='nearest')
+        self.up = nn.Upsample(scale_factor=2)
         # self.up = ConvTrans()
 
         self.conv1 = ResBlockIN(in_channels, 64)  # DoubleConv(in_channels, 64)
@@ -394,7 +331,7 @@ class XNet2(nn.Module):
 
         self.a1 = AttentionBlockIN(256, 256, 128)
         self.a2 = AttentionBlockIN(128, 128, 64)
-        self.a3 = AttentionBlockIN(64, 64, 64)
+        self.a3 = AttentionBlockIN(64, 64, 32)
 
         self.cat_conv1 = ResBlockIN(512, 256)  # DoubleConv(512, 256)
         self.cat_conv2 = ResBlockIN(256, 128)  # DoubleConv(256, 128)
@@ -402,11 +339,11 @@ class XNet2(nn.Module):
 
         self.respath1 = Respath(256, 256, self.respath_len)
         self.respath2 = Respath(128, 128, self.respath_len)
-        # self.respath3 = Respath(64, 64,2)
+        self.respath3 = Respath(64, 64, self.respath_len)
 
     def forward(self, x):
         c1 = self.conv1(x)  # [1, 64, 400, 400]
-        # mr_c1 = self.respath3(c1)  # [1,64,400,400]
+        mr_c1 = self.respath3(c1)  # [1,64,400,400]
         c1_pool = self.pool(c1)  # [1, 64, 200, 200]
 
         c2 = self.conv2(c1_pool)  # [1, 128, 200, 200]
@@ -457,19 +394,108 @@ class XNet2(nn.Module):
 
         up14 = self.up(c13)  # [1, 128, 400, 400]
         c14 = self.conv14(up14)  # [1, 64, 400, 400]
-
-        # a4 = self.a3(c14, mr_c1)  # [1, 64, 400, 400]
-        # c14 = torch.cat((c1, c14), dim=1)  # [1, 128, 400, 400]
-        # c14 = self.cat_conv3(c14)  # [1, 64, 400, 400]
+        a4 = self.a3(c14, mr_c1)  # [1, 64, 400, 400]
+        c14 = torch.cat((c14, a4), dim=1)  # [1, 128, 400, 400]
+        c14 = self.cat_conv3(c14)  # [1, 64, 400, 400]
 
         c15 = self.conv15(c14)  # [1, 3, 400, 400]
 
         return c15
 
 
+class Network5(nn.Module):
+    def __init__(self, in_channels=3, out_channels=3, dropout=0.2, affine=False, use_batch=False):
+        """
+        Initializes each part of the convolutional neural network.
+        """
+        super().__init__()
+        self.pool = nn.MaxPool2d(2, 2)
+
+        # Downsampling
+        self.conv1 = ResBlockM(in_channels, 32, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch, padding_mode='reflect')
+        self.conv2 = ResBlockM(32, 64, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch)
+        self.conv3 = ResBlockM(64, 128, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch)
+        self.conv4 = ResBlockM(128, 256, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch)
+        self.conv5 = ResBlockM(256, 512, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch)
+
+        # Bottleneck
+        self.conv6 = ResBlockM(512, 512, kernel_size=4, stride=1, padding=3, dilation=2, with_affine=affine,
+                               use_batch=use_batch)
+
+        # Upsampling
+        self.up1 = ConvTransM(512, 256, kernel_size=2, stride=2, padding=0)
+        self.up_c1 = ResBlockM(512, 256, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch)
+
+        self.up2 = ConvTransM(256, 128, kernel_size=2, stride=2, padding=0)
+        self.up_c2 = ResBlockM(256, 128, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch)
+
+        self.up3 = ConvTransM(128, 64, kernel_size=2, stride=2, padding=0)
+        self.up_c3 = ResBlockM(128, 64, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch)
+
+        self.up4 = ConvTransM(64, 32, kernel_size=2, stride=2, padding=0)
+        self.up_c4 = ResBlockM(64, 32, kernel_size=3, stride=1, padding=1, dropout=dropout, with_affine=affine,
+                               use_batch=use_batch)
+
+        self.head = nn.Conv2d(32, out_channels, kernel_size=(1, 1), stride=(1, 1), padding=0)
+
+        # self.output = nn.Conv2d(3, 3, kernel_size=3, stride=1, padding=1)
+
+    def forward(self, x):
+        """
+        Implements the forward pass for the given data `x`.
+        :param x: The input data.
+        :return: The neural network output.
+        """
+        x1 = self.conv1(x)  # [1, 32, 400, 400]
+        x1_pool = self.pool(x1)  # [1, 32, 200, 200]
+
+        x2 = self.conv2(x1_pool)  # [1, 64, 200, 200]
+        x2_pool = self.pool(x2)  # [1, 64, 100, 100]
+
+        x3 = self.conv3(x2_pool)  # [1, 128, 100, 100]
+        x3_pool = self.pool(x3)  # [1, 128, 50, 50]
+
+        x4 = self.conv4(x3_pool)  # [1, 256, 50, 50]
+        x4_pool = self.pool(x4)  # [1, 256, 25, 25]
+
+        # bottle_neck
+        x5 = self.conv5(x4_pool)  # [1, 512, 25, 25]
+
+        # bottle_neck
+        # x6 = self.conv6(x5)  # [1, 512, 25, 25]
+
+        x7 = self.up1(x5)  # [1, 256, 50, 50]
+        x7 = torch.cat((x4, x7), dim=1)  # [1, 512, 50, 50]
+        x7 = self.up_c1(x7)  # [1, 256, 50, 50]
+
+        x8 = self.up2(x7)  # [1, 128, 100, 100]
+        x8 = torch.cat((x3, x8), dim=1)  # [1, 256, 100, 100]
+        x8 = self.up_c2(x8)  # [1, 128, 100, 100]
+
+        x9 = self.up3(x8)  # [1, 64, 200, 200]]
+        x9 = torch.cat((x2, x9), dim=1)  # [1, 128, 200, 200]
+        x9 = self.up_c3(x9)  # [1, 64, 200, 200]
+
+        x10 = self.up4(x9)  # [1, 32, 400, 400]
+        x10 = torch.cat((x1, x10), dim=1)  # [1, 64, 400, 400])
+        x10 = self.up_c4(x10)  # [1, 32, 400, 400]
+
+        head = self.head(x10)  # [1, 3, 400, 400]
+
+        return head
+
+
 def test():
     x = torch.randn((1, 3, 400, 400))
-    model = XNet2(in_channels=3, out_channels=3)
+    model = AttResUNET2(in_channels=3, out_channels=3)
     preds = model(x)
     print(preds.shape)
 

@@ -2,31 +2,27 @@ import os
 
 import torch
 from utils import load_checkpoint
-from models.model import AttResUNET2
+from models.model import AttResUNET2, XNet, XNet2
 from PIL import Image
 import torchvision.transforms as transforms
 from tqdm import tqdm
 import cv2
 
 # load model
-with_lrelu = True
-
-weights_path_lr = "res/train6/best_dehaze_mse_lssim_ploss3_no_clahe_checkpoint.pth.tar"
-# weights_path = "res/train5/best_dehaze_mse_lssim_ploss2_no_clahe_checkpoint.pth.tar"
+weights_path = "./res/train1/best_ploss2_xnet_checkpoint.pth.tar"
 
 w, h = 400, 400
 
-net_lr = AttResUNET2()
-weights_lr = torch.load(weights_path_lr)
-net_lr = load_checkpoint(weights_lr, net_lr)
+net = XNet2(respath_len=1)
+weights = torch.load(weights_path)
+net = load_checkpoint(weights, net)
 
 # net = AttResUNET()
 # weights = torch.load(weights_path)
 # net = load_checkpoint(weights, net)
 
-images_folder_path = "C:/Users/Administrator/Desktop/datasets/SOTs/Detection/foggy road scenes.v1i.yolov5pytorch/test/images/"
-dest_lr_folder_path = "C:/Users/Administrator/Desktop/datasets/SOTs/Detection/foggy road scenes.v1i.yolov5pytorch/test/preds/"
-dest_folder_path = "C:/Users/Administrator/Desktop/datasets/SOTs/indoor/preds_default_lr/"
+images_folder_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/outdoor/hazy/"
+dest_folder_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/outdoor/preds_xnet_rp_1/"
 
 hazy_images = os.listdir(images_folder_path)
 
@@ -55,17 +51,11 @@ def batch_inference():
         input_ = input_.unsqueeze(0)
 
         # do inference
-        net_lr.eval()
-        # net.eval()
+        net.eval()
+        preds = net(input_)
+        preds = process_tensor(preds)
 
-        preds_lr = net_lr(input_)
-        # preds = net(input_)
-
-        preds_lr = process_tensor(preds_lr)
-        # preds = process_tensor(preds)
-
-        cv2.imwrite(dest_lr_folder_path + i, preds_lr)
-        # cv2.imwrite(dest_folder_path + i, preds)
+        cv2.imwrite(dest_folder_path + i, preds)
         cv2.waitKey(-1)
 
 

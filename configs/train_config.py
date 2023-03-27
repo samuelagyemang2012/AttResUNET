@@ -3,6 +3,7 @@ import torch
 # Hyperparameters etc.
 LEARNING_RATE = 1e-4
 WEIGHT_DECAY = 1e-2
+ADAM_BETAS = (0.9, 0.99)
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 1
 INTERVAL = 10
