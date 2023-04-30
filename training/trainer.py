@@ -7,13 +7,13 @@ from tqdm import tqdm
 from albumentations.pytorch import ToTensorV2
 from torch.utils.data import DataLoader
 import albumentations as A
-from models.model import XNet, XNet2, Network5
-from dataset_cv import Haze
+from models.model import *
+from dataset_cv import Data
 from early_stopping import EarlyStopping
 from model_checkpoint import ModelCheckpoint
 from lion_pytorch import Lion
 from torch.optim import Adam
-from loss import MyLoss
+from loss import MyLoss, MSESSIM
 import cv2
 from utils import save_checkpoint
 from torchmetrics.functional import structural_similarity_index_measure, peak_signal_noise_ratio
@@ -46,7 +46,8 @@ def show_image(arr):
 
 def save_img(arr, path):
     arr = process_tensor(arr)
-    arr = cv2.normalize(arr, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+    arr = arr * 255
+    # arr = cv2.normalize(arr, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
     cv2.imwrite(path, arr)
 
 
@@ -110,24 +111,29 @@ def train():
 
     info = []
 
-    model_name = "ploss_vgg19_xnet2_checkpoint.pth.tar"
+    model_name = "net7att_myloss_ploss_vgg19_net7_checkpoint.pth.tar"
 
     if not cfg.LOAD_MODEL:
         print("creating model")
+        # net = DeBlur(use_batch=True).to(cfg.DEVICE)
+        # net = Network7(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False).to(cfg.DEVICE)
+        # net = Network7DeBlur(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False).to(cfg.DEVICE)
+        net = Network7Att(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False).to(cfg.DEVICE)
+        # net = Network7L(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False).to(cfg.DEVICE)
+        # net = Network5(in_channels=3, out_channels=3).to(cfg.DEVICE)
 
-        net = XNet2(in_channels=3, out_channels=3).to(cfg.DEVICE)
-    # else:
-    #     pass
-    # print("loading checkpoint")
-    # weights_path = "res/train0/best_dehaze_mse_lssim_ploss2_no_clahe_checkpoint.pth.tar"
-    # net = AttResUNET()
-    # weights = torch.load(weights_path)
-    # net = load_checkpoint(weights, net)
-    # net = net.to(cfg.DEVICE)
+    else:
+        pass
+        # print("loading checkpoint")
+        # weights_path = "res/train1/best_" + model_name
+        # net = Network6(in_channels=3, dropout=0.2, affine=False, use_batch=False, lrelu=0.2).to(cfg.DEVICE)
+        # weights = torch.load(weights_path)
+        # net = load_checkpoint(weights, net)
+        # net = net.to(cfg.DEVICE)
 
     print("preparing data")
-    train_dataset = Haze(clear_imgs_dir=cfg.TRAIN_CLEAR_DIR, hazy_imgs_dir=cfg.TRAIN_HAZY_DIR)
-    val_dataset = Haze(clear_imgs_dir=cfg.VAL_CLEAR_DIR, hazy_imgs_dir=cfg.VAL_CLEAR_DIR)
+    train_dataset = Data(clear_imgs_dir=cfg.TRAIN_CLEAR_DIR, deg_imgs_dir=cfg.TRAIN_DEG_DIR)
+    val_dataset = Data(clear_imgs_dir=cfg.VAL_CLEAR_DIR, deg_imgs_dir=cfg.VAL_CLEAR_DIR)
 
     train_loader = DataLoader(dataset=train_dataset, batch_size=cfg.BATCH_SIZE, shuffle=True,
                               num_workers=cfg.NUM_WORKERS)
@@ -135,6 +141,8 @@ def train():
 
     print("setting criterion and opt")
     criterion = MyLoss().to(cfg.DEVICE)
+    # criterion = MSESSIM().to(cfg.DEVICE)
+
     lion_opt = Lion(net.parameters(), lr=cfg.LEARNING_RATE, weight_decay=cfg.WEIGHT_DECAY)
     adam_opt = Adam(net.parameters(), lr=cfg.LEARNING_RATE, betas=cfg.ADAM_BETAS)
 
@@ -159,6 +167,7 @@ def train():
             # with torch.cuda.amp.autocast():
             clean_image = net.forward(img_haze)
             train_loss = criterion(img_clear, clean_image)
+            # train_loss = criterion2(clean_image, img_clear)
 
             train_ssim = structural_similarity_index_measure(target=img_clear, preds=clean_image, data_range=1.0)
             train_psnr = peak_signal_noise_ratio(target=img_clear, preds=clean_image)
@@ -183,6 +192,7 @@ def train():
             # with torch.cuda.amp.autocast():
             clean_image = net.forward(img_haze)
             val_loss = criterion(img_clear, clean_image)
+            # val_loss = criterion2(clean_image, img_clear)
 
             val_ssim = structural_similarity_index_measure(target=img_clear, preds=clean_image, data_range=1.0)
             val_psnr = peak_signal_noise_ratio(target=img_clear, preds=clean_image)

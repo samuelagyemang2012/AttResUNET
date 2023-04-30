@@ -14,14 +14,14 @@ Rename files
 
 
 def rename_files():
-    folder_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/ITS/hazy_copy/"
+    folder_path = "F:/datasets/dehaze/OTS/hazy_real/"
     files = os.listdir(folder_path)
     a = []
 
-    for f in files:
+    for f in files[0:3]:
         x = f.split("_")
         name = x[0]
-        new_name = name + ".png"
+        new_name = name + ".jpg"
 
         os.rename(folder_path + f, folder_path + new_name)
 
@@ -245,13 +245,172 @@ def eqHist():
     # Reading the image
 
 
+def ots():
+    images_path = "F:/datasets/dehaze/OTS/clear/hazy/part4/part4/"
+    dest_path = "F:/datasets/dehaze/OTS/clear/hazy/part4/haze1.02/"
+
+    iter = os.scandir(images_path)
+
+    for entry in tqdm(iter):
+        if entry.is_file():
+            filename = entry.name
+            arr = filename.split("_")
+            end = arr[-1].split(".jpg")
+            x = arr[1] + " " + end[0]
+
+            if x == "1 0.2":
+                b = x.replace(" ", "_")
+                src = images_path + filename
+                dest = dest_path + arr[0] + "_" + b + ".jpg"
+
+                shutil.copy(src, dest)
+                # print(src)
+                # print(dest)
+                # print("")
+
+
+def compare_images():
+    from metrics.metrics import get_SSIM
+    c = 0
+    set_1 = "F:/datasets/dehaze/OTS/clear/clear/"
+    set_2 = "F:/datasets/dehaze/SOTS-Test/outdoor/clear/"
+
+    hazy_path = "F:/datasets/dehaze/OTS/clear/hazy_real/"
+    dest_base_path = "F:/datasets/dehaze/OTS/clear/misc/"
+
+    set1_files = os.listdir(set_1)
+    hazy_files = os.listdir(hazy_path)
+
+    set2_files = os.listdir(set_2)
+
+    for s2 in set2_files:
+        for i, s1 in enumerate(set1_files):
+            a = s2.split(".")[0]
+            b = s1.split(".")[0]
+
+            if a == b:
+                clear_src = set_1 + s1
+                clear_dest = dest_base_path + "clear/" + s1
+
+                hazy_src = hazy_path + hazy_files[i]
+                hazy_dest = dest_base_path + "hazy/" + hazy_files[i]
+
+                shutil.move(clear_src, clear_dest)
+                shutil.move(hazy_src, hazy_dest)
+
+                # print("clear_: ", set_1 + s1)
+                # print("hazy: ", hazy_path + hazy_files[i])
+
+
+def snow100k():
+    clear_path = "F:/datasets/Snow100K/all/gt/"
+    snow_path = "F:/datasets/Snow100K/all/synthetic/"
+
+    train_clear_dest = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/train/clear/"
+    train_deg_dest = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/train/deg/"
+
+    val_clear_dest = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/val/clear/"
+    val_deg_dest = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/val/deg/"
+
+    test_clear_dest = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/test/clear/"
+    test_deg_dest = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/test/deg/"
+
+    test2_clear_dest = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/test2/clear/"
+    test2_deg_dest = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/test2/deg/"
+
+    gt = os.listdir(snow_path)
+    random.shuffle(gt)
+
+    train = gt[0:1500]
+    val = gt[1500:1900]
+    test = gt[1900:2400]
+
+    for tr in tqdm(train):
+        clear_img_path = clear_path + tr
+        snow_img_path = snow_path + tr
+
+        clear_dest_path = train_clear_dest + tr
+        snow_dest_path = train_deg_dest + tr
+
+        shutil.copy(clear_img_path, clear_dest_path)
+        shutil.copy(snow_img_path, snow_dest_path)
+
+    for vl in tqdm(val):
+        clear_img_path = clear_path + vl
+        snow_img_path = snow_path + vl
+
+        clear_dest_path = val_clear_dest + vl
+        snow_dest_path = val_deg_dest + vl
+
+        shutil.copy(clear_img_path, clear_dest_path)
+        shutil.copy(snow_img_path, snow_dest_path)
+
+    for tt in tqdm(test):
+        clear_img_path = clear_path + tt
+        snow_img_path = snow_path + tt
+
+        clear_dest_path = test_clear_dest + tt
+        snow_dest_path = test_deg_dest + tt
+
+        shutil.copy(clear_img_path, clear_dest_path)
+        shutil.copy(snow_img_path, snow_dest_path)
+
+
+def snow100k_test():
+    clear_source_path = "F:/datasets/Snow100K/all/gt/"
+    deg_source_path = "F:/datasets/Snow100K/all/synthetic/"
+
+    train_path = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/train/deg/"
+    val_path = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/val/deg/"
+    test_path = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/test/deg/"
+
+    clear_dest_path = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/test2/clear/"
+    deg_dest_path = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/test2/deg/"
+
+    clear_source_files = os.listdir(clear_source_path)
+    # deg_source_files = os.listdir(deg_source_path)
+
+    train_files = os.listdir(train_path)
+    val_files = os.listdir(val_path)
+    test_files = os.listdir(test_path)
+
+    for tr in train_files:
+        if tr in clear_source_files:
+            clear_source_files.remove(tr)
+
+    for vl in val_files:
+        if vl in clear_source_files:
+            clear_source_files.remove(vl)
+
+    for tt in test_files:
+        if tt in clear_source_files:
+            clear_source_files.remove(tt)
+
+    print(len(clear_source_files))
+
+    random.shuffle(clear_source_files)
+    test2_files = clear_source_files[0:500]
+
+    for tf in tqdm(test2_files):
+        clear_source = clear_source_path + tf
+        deg_source = deg_source_path + tf
+
+        clear_dest = clear_dest_path + tf
+        deg_dest = deg_dest_path + tf
+
+        shutil.copy(clear_source, clear_dest)
+        shutil.copy(deg_source, deg_dest)
+
+
 if __name__ == "__main__":
-    pass
-# split()
-# rename_files()
-# get_labels()
-# get_foggy_images_bdd()
-# move_foggy_images_bdd()
-# assert_data()
-# its()
-# white_balance()
+    snow100k_test()
+    # compare_images()
+    # ots()
+    # split()
+    # rename_files()
+    # get_labels()
+    # get_foggy_images_bdd()
+    # move_foggy_images_bdd()
+    # assert_data()
+    # its()
+    # white_balance()

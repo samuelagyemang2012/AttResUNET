@@ -14,11 +14,11 @@ IMAGE_WIDTH = 400  # 1918 originally
 PIN_MEMORY = True
 LOAD_MODEL = False
 RES_DIR = "../res/"
-TRAIN_DEG_DIR = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/train/deg/"  # "C:/Users/Administrator/Desktop/datasets/dehaze/reside/OTS/training_data/train/hazy/"
-TRAIN_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/train/clear/"  # "C:/Users/Administrator/Desktop/datasets/dehaze/reside/OTS/training_data/train/clear/"
+TRAIN_DEG_DIR = "C:/Users/Administrator/Desktop/datasets/snow100k/preds/training_data_large/train/blur/"
+TRAIN_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/snow100k/preds/training_data_large/train/clear/"
 
-VAL_DEG_DIR = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/val/deg/"  # "C:/Users/Administrator/Desktop/datasets/dehaze/reside/OTS/training_data/val/hazy/"
-VAL_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/val/clear/"  # "C:/Users/Administrator/Desktop/datasets/dehaze/reside/OTS/training_data/val/clear/"
+VAL_DEG_DIR = "C:/Users/Administrator/Desktop/datasets/snow100k/preds/training_data_large/val/blur/"
+VAL_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/snow100k/preds/training_data_large/val/clear/"
 TOLERANCE = 30
 
 # colab
