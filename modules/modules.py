@@ -87,6 +87,18 @@ class UpConvM(nn.Module):
         return x
 
 
+class UpConvX(nn.Module):
+    def __init__(self, in_channels, scale_factor=2):
+        super(UpConvX, self).__init__()
+
+        self.conv = nn.Conv2d(in_channels, in_channels * scale_factor ** 2, 3, 1, 1)
+        self.ps = nn.PixelShuffle(scale_factor)  # in_c * 4, H, W --> in_c, H*2, W*2
+        self.act = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        return self.act(self.ps(self.conv(x)))
+
+
 class ConvTransM(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride, padding, dilation=1):
         super(ConvTransM, self).__init__()
@@ -212,7 +224,7 @@ class GhostModuleM(nn.Module):
 
 def test():
     x = torch.randn((1, 64, 256, 256))
-    net = GhostModuleM(inp=64, oup=256, kernel_size=3, ratio=2, dw_size=3, stride=1)
+    net = UpConvX(in_channels=64)
     preds = net(x)
 
     print(preds.shape)

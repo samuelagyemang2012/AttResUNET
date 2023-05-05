@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torchvision.transforms.functional as TF
 import torch.nn.functional as F
-from modules.modules import DoubleConv, AttentionBlockM, ResBlockM, ConvTransM, GhostModuleM, UpConvM
+from modules.modules import DoubleConv, AttentionBlockM, ResBlockM, ConvTransM, GhostModuleM, UpConvM, UpConvX
 import torchvision.transforms as transforms
 import numpy as np
 from utils import load_checkpoint
@@ -353,6 +353,78 @@ class Network7(nn.Module):
 
         x10 = self.up4(x9)  # [1, 32, 400, 400]
         x10 = torch.cat((x1, x10), dim=1)  # [1, 64, 400, 400])
+        x10 = self.up_c4(x10)  # [1, 32, 400, 400]
+
+        pred = self.head(x10)  # [1, 3, 400, 400]
+
+        return pred
+
+
+class Network7X(nn.Module):
+    def __init__(self, in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False):
+        """
+        Initializes each part of the convolutional neural network.
+        """
+        super().__init__()
+        self.pool = nn.MaxPool2d(2, 2)
+
+        # Downsampling
+        self.conv1 = GhostModuleM(in_channels, 32, kernel_size=3, stride=1, use_batchnorm=use_batchnorm)
+        self.conv2 = GhostModuleM(32, 64, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+        self.conv3 = GhostModuleM(64, 128, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+        self.conv4 = GhostModuleM(128, 256, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+        self.conv5 = GhostModuleM(256, 512, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+
+        # Bottleneck
+        # self.conv6 = ResBlockM(512, 512, kernel_size=4, stride=1, padding=3, dilation=2, with_affine=affine,
+        #                        use_batch=use_batch)
+
+        # Upsampling
+
+        self.up1 = UpConvX(512)
+        self.up_c1 = GhostModuleM(512, 256, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+
+        self.up2 = UpConvX(256, )
+        self.up_c2 = GhostModuleM(256, 128, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+
+        self.up3 = UpConvX(128)
+        self.up_c3 = GhostModuleM(128, 64, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+
+        self.up4 = UpConvX(64)
+        self.up_c4 = GhostModuleM(64, 32, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+
+        self.head = nn.Conv2d(32, out_channels, kernel_size=(1, 1), stride=(1, 1), padding=0)
+
+    def forward(self, x):
+        x1 = self.conv1(x)  # [1, 32, 400, 400]
+        x1_pool = self.pool(x1)  # [1, 32, 200, 200]
+
+        x2 = self.conv2(x1_pool)  # [1, 64, 200, 200]
+        x2_pool = self.pool(x2)  # [1, 64, 100, 100]
+
+        x3 = self.conv3(x2_pool)  # [1, 128, 100, 100]
+        x3_pool = self.pool(x3)  # [1, 128, 50, 50]
+
+        x4 = self.conv4(x3_pool)  # [1, 256, 50, 50]
+        x4_pool = self.pool(x4)  # [1, 256, 25, 25]
+
+        # bottle_neck
+        x5 = self.conv5(x4_pool)  # [1, 512, 25, 25]
+
+        x7 = self.up1(x5)  # [1, 256, 50, 50]
+        # x7 = torch.cat((x4, x7), dim=1)  # [1, 512, 50, 50]
+        x7 = self.up_c1(x7)  # [1, 256, 50, 50])
+
+        x8 = self.up2(x7)  # [1, 128, 100, 100]
+        # x8 = torch.cat((x3, x8), dim=1)  # [1, 256, 100, 100]
+        x8 = self.up_c2(x8)  # [1, 128, 100, 100]
+
+        x9 = self.up3(x8)  # [1, 64, 200, 200]]
+        # x9 = torch.cat((x2, x9), dim=1)  # [1, 128, 200, 200]
+        x9 = self.up_c3(x9)  # [1, 64, 200, 200]
+
+        x10 = self.up4(x9)  # [1, 32, 400, 400]
+        # x10 = torch.cat((x1, x10), dim=1)  # [1, 64, 400, 400])
         x10 = self.up_c4(x10)  # [1, 32, 400, 400]
 
         pred = self.head(x10)  # [1, 3, 400, 400]
@@ -758,7 +830,7 @@ class DeBlur2(nn.Module):
 def test():
     x = torch.randn((1, 3, 400, 400))
     # model = Network7(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False)
-    model = DeBlur()  # in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=True)
+    model = Network7X()  # in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=True)
     preds = model(x)
     print(preds.shape)
 

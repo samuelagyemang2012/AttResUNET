@@ -118,7 +118,7 @@ def train():
         # net = DeBlur(use_batch=True).to(cfg.DEVICE)
         # net = Network7(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False).to(cfg.DEVICE)
         # net = Network7DeBlur(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False).to(cfg.DEVICE)
-        net = Network7Att(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False).to(cfg.DEVICE)
+        net = Network7X(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False).to(cfg.DEVICE)
         # net = Network7L(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False).to(cfg.DEVICE)
         # net = Network5(in_channels=3, out_channels=3).to(cfg.DEVICE)
 
