@@ -360,7 +360,7 @@ class Network7(nn.Module):
         return pred
 
 
-class Network7X(nn.Module):
+class Network7V2(nn.Module):
     def __init__(self, in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False):
         """
         Initializes each part of the convolutional neural network.
@@ -381,17 +381,17 @@ class Network7X(nn.Module):
 
         # Upsampling
 
-        self.up1 = UpConvX(512)
-        self.up_c1 = GhostModuleM(512, 256, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+        self.up1 = UpConvM(512, 256, use_batchnorm=True)
+        self.up_c1 = ResBlockM(512, 256, kernel_size=3, stride=1, dropout=dropout, padding=1)
 
-        self.up2 = UpConvX(256, )
-        self.up_c2 = GhostModuleM(256, 128, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+        self.up2 = UpConvM(256, 128, use_batchnorm=True)
+        self.up_c2 = ResBlockM(256, 128, kernel_size=3, stride=1, dropout=dropout, padding=1)
 
-        self.up3 = UpConvX(128)
-        self.up_c3 = GhostModuleM(128, 64, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+        self.up3 = UpConvM(128, 64, use_batchnorm=True)
+        self.up_c3 = ResBlockM(128, 64, kernel_size=3, stride=1, dropout=dropout, padding=1)
 
-        self.up4 = UpConvX(64)
-        self.up_c4 = GhostModuleM(64, 32, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+        self.up4 = UpConvM(64, 32, use_batchnorm=True)
+        self.up_c4 = ResBlockM(64, 32, kernel_size=3, stride=1, dropout=dropout, padding=1)
 
         self.head = nn.Conv2d(32, out_channels, kernel_size=(1, 1), stride=(1, 1), padding=0)
 
@@ -412,19 +412,19 @@ class Network7X(nn.Module):
         x5 = self.conv5(x4_pool)  # [1, 512, 25, 25]
 
         x7 = self.up1(x5)  # [1, 256, 50, 50]
-        # x7 = torch.cat((x4, x7), dim=1)  # [1, 512, 50, 50]
+        x7 = torch.cat((x4, x7), dim=1)  # [1, 512, 50, 50]
         x7 = self.up_c1(x7)  # [1, 256, 50, 50])
 
         x8 = self.up2(x7)  # [1, 128, 100, 100]
-        # x8 = torch.cat((x3, x8), dim=1)  # [1, 256, 100, 100]
+        x8 = torch.cat((x3, x8), dim=1)  # [1, 256, 100, 100]
         x8 = self.up_c2(x8)  # [1, 128, 100, 100]
 
         x9 = self.up3(x8)  # [1, 64, 200, 200]]
-        # x9 = torch.cat((x2, x9), dim=1)  # [1, 128, 200, 200]
+        x9 = torch.cat((x2, x9), dim=1)  # [1, 128, 200, 200]
         x9 = self.up_c3(x9)  # [1, 64, 200, 200]
 
         x10 = self.up4(x9)  # [1, 32, 400, 400]
-        # x10 = torch.cat((x1, x10), dim=1)  # [1, 64, 400, 400])
+        x10 = torch.cat((x1, x10), dim=1)  # [1, 64, 400, 400])
         x10 = self.up_c4(x10)  # [1, 32, 400, 400]
 
         pred = self.head(x10)  # [1, 3, 400, 400]
@@ -830,7 +830,7 @@ class DeBlur2(nn.Module):
 def test():
     x = torch.randn((1, 3, 400, 400))
     # model = Network7(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False)
-    model = Network7X()  # in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=True)
+    model = Network7V2()  # in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=True)
     preds = model(x)
     print(preds.shape)
 
