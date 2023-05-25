@@ -105,7 +105,7 @@ class MyLoss(nn.Module):
     def __init__(self):
         super(MyLoss, self).__init__()
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.vgg19loss = VGGLoss()
+        # self.vgg19loss = VGGLoss()
         self.vgg16loss = VGGPerceptualLoss()
 
         # self.vgg_model = vgg16(weights="VGG16_Weights.DEFAULT").features[:16]
