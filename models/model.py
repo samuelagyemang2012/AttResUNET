@@ -3,7 +3,8 @@ import torch
 import torch.nn as nn
 import torchvision.transforms.functional as TF
 import torch.nn.functional as F
-from modules.modules import DoubleConv, AttentionBlockM, ResBlockM, ConvTransM, GhostModuleM, UpConvM
+from modules.modules import *
+import time
 import torchvision.transforms as transforms
 import numpy as np
 from utils import load_checkpoint
@@ -288,6 +289,86 @@ class Network5(nn.Module):
         return head
 
 
+class SCNetwork5(nn.Module):
+    def __init__(self, in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=True):
+        """
+        Initializes each part of the convolutional neural network.
+        """
+        super().__init__()
+        self.pool = nn.MaxPool2d(2, 2)
+
+        # Downsampling
+        self.conv1 = ResBlockM(in_channels, 32, kernel_size=3, stride=1, padding=1, dropout=dropout,
+                               padding_mode='reflect')
+        self.conv2 = ResBlockM(32, 64, kernel_size=3, stride=1, padding=1, dropout=dropout)
+        self.conv3 = ResBlockM(64, 128, kernel_size=3, stride=1, padding=1, dropout=dropout)
+        self.conv4 = ResBlockM(128, 256, kernel_size=3, stride=1, padding=1, dropout=dropout)
+        self.conv5 = ResBlockM(256, 512, kernel_size=3, stride=1, padding=1, dropout=dropout)
+
+        self.spatial_att = SpatialAttention()
+        self.channel_att = ChannelAttention(ch=512)
+
+        # Bottleneck
+        # self.conv6 = ResBlockM(512, 512, kernel_size=4, stride=1, padding=3, dilation=2, with_affine=affine,
+        #                        use_batch=use_batch)
+
+        # Upsampling
+
+        self.up1 = UpConvM(512, 256, use_batchnorm=use_batchnorm)
+        self.up_c1 = ResBlockM(512, 256, kernel_size=3, stride=1, dropout=dropout)
+
+        self.up2 = UpConvM(256, 128, use_batchnorm=use_batchnorm)
+        self.up_c2 = ResBlockM(256, 128, kernel_size=3, stride=1, dropout=dropout)
+
+        self.up3 = UpConvM(128, 64, use_batchnorm=use_batchnorm)
+        self.up_c3 = ResBlockM(128, 64, kernel_size=3, stride=1, dropout=dropout)
+
+        self.up4 = UpConvM(64, 32, use_batchnorm=use_batchnorm)
+        self.up_c4 = ResBlockM(64, 32, kernel_size=3, stride=1, dropout=dropout)
+
+        self.head = nn.Conv2d(32, out_channels, kernel_size=(1, 1), stride=(1, 1), padding=0)
+
+    def forward(self, x):
+        x1 = self.conv1(x)  # [1, 32, 400, 400]
+        x1 = self.spatial_att(x1)  # [1, 32, 400, 400]
+
+        x1_pool = self.pool(x1)  # [1, 32, 200, 200]
+        x2 = self.conv2(x1_pool)  # [1, 64, 200, 200]
+
+        x2_pool = self.pool(x2)  # [1, 64, 100, 100]
+        x3 = self.conv3(x2_pool)  # [1, 128, 100, 100]
+
+        x3_pool = self.pool(x3)  # [1, 128, 50, 50]
+        x4 = self.conv4(x3_pool)  # [1, 256, 50, 50]
+
+        x4_pool = self.pool(x4)  # [1, 256, 25, 25]
+
+        # bottle_neck
+        x5 = self.conv5(x4_pool)  # [1, 512, 25, 25]
+        x5 = self.channel_att(x5)  # [1, 512, 25, 25])
+
+        x7 = self.up1(x5)  # [1, 256, 50, 50]
+        x7 = torch.cat((x4, x7), dim=1)  # [1, 512, 50, 50]
+        x7 = self.up_c1(x7)  # [1, 256, 50, 50])
+
+        x8 = self.up2(x7)  # [1, 128, 100, 100]
+        x8 = torch.cat((x3, x8), dim=1)  # [1, 256, 100, 100]
+        x8 = self.up_c2(x8)  # [1, 128, 100, 100]
+
+        x9 = self.up3(x8)  # [1, 64, 200, 200]]
+        x9 = torch.cat((x2, x9), dim=1)  # [1, 128, 200, 200]
+        x9 = self.up_c3(x9)  # [1, 64, 200, 200]
+
+        x10 = self.up4(x9)  # [1, 32, 400, 400]
+        x10 = torch.cat((x1, x10), dim=1)  # [1, 64, 400, 400])
+        x10 = self.up_c4(x10)  # [1, 32, 400, 400]
+        x10 = self.spatial_att(x10)
+
+        pred = self.head(x10)  # [1, 3, 400, 400]
+
+        return pred
+
+
 class Network7(nn.Module):
     def __init__(self, in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False):
         """
@@ -360,8 +441,8 @@ class Network7(nn.Module):
         return pred
 
 
-class Network7DeBlur(nn.Module):
-    def __init__(self, in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False):
+class SCNetwork7(nn.Module):
+    def __init__(self, in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=True):
         """
         Initializes each part of the convolutional neural network.
         """
@@ -374,6 +455,9 @@ class Network7DeBlur(nn.Module):
         self.conv3 = GhostModuleM(64, 128, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
         self.conv4 = GhostModuleM(128, 256, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
         self.conv5 = GhostModuleM(256, 512, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+
+        self.spatial_att = SpatialAttention()
+        # self.channel_att = ChannelAttention(ch=512)
 
         # Bottleneck
         # self.conv6 = ResBlockM(512, 512, kernel_size=4, stride=1, padding=3, dilation=2, with_affine=affine,
@@ -393,25 +477,25 @@ class Network7DeBlur(nn.Module):
         self.up4 = UpConvM(64, 32, use_batchnorm=use_batchnorm)
         self.up_c4 = GhostModuleM(64, 32, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
 
-        self.pred = nn.Conv2d(32, out_channels, kernel_size=(1, 1), stride=(1, 1), padding=0)
-
-        self.deblur = DeBlur()
+        self.head = nn.Conv2d(32, out_channels, kernel_size=(1, 1), stride=(1, 1), padding=0)
 
     def forward(self, x):
         x1 = self.conv1(x)  # [1, 32, 400, 400]
+
         x1_pool = self.pool(x1)  # [1, 32, 200, 200]
-
         x2 = self.conv2(x1_pool)  # [1, 64, 200, 200]
+
         x2_pool = self.pool(x2)  # [1, 64, 100, 100]
-
         x3 = self.conv3(x2_pool)  # [1, 128, 100, 100]
-        x3_pool = self.pool(x3)  # [1, 128, 50, 50]
 
+        x3_pool = self.pool(x3)  # [1, 128, 50, 50]
         x4 = self.conv4(x3_pool)  # [1, 256, 50, 50]
+
         x4_pool = self.pool(x4)  # [1, 256, 25, 25]
 
         # bottle_neck
         x5 = self.conv5(x4_pool)  # [1, 512, 25, 25]
+        x5 = self.spatial_att(x5)  # [1, 512, 25, 25])
 
         x7 = self.up1(x5)  # [1, 256, 50, 50]
         x7 = torch.cat((x4, x7), dim=1)  # [1, 512, 50, 50]
@@ -429,94 +513,168 @@ class Network7DeBlur(nn.Module):
         x10 = torch.cat((x1, x10), dim=1)  # [1, 64, 400, 400])
         x10 = self.up_c4(x10)  # [1, 32, 400, 400]
 
-        pred = self.pred(x10)  # [1, 3, 400, 400]
+        pred = self.head(x10)  # [1, 3, 400, 400]
 
-        final = self.deblur(pred)
-
-        return final
+        return pred
 
 
-class Network7DeBlur2(nn.Module):
-    def __init__(self, in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False, deblur_weights=None):
-        """
-        Initializes each part of the convolutional neural network.
-        """
-        super().__init__()
-        self.pool = nn.MaxPool2d(2, 2)
+# class Network7DeBlur(nn.Module):
+#     def __init__(self, in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False):
+#         """
+#         Initializes each part of the convolutional neural network.
+#         """
+#         super().__init__()
+#         self.pool = nn.MaxPool2d(2, 2)
+#
+#         # Downsampling
+#         self.conv1 = GhostModuleM(in_channels, 32, kernel_size=3, stride=1, use_batchnorm=use_batchnorm)
+#         self.conv2 = GhostModuleM(32, 64, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+#         self.conv3 = GhostModuleM(64, 128, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+#         self.conv4 = GhostModuleM(128, 256, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+#         self.conv5 = GhostModuleM(256, 512, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+#
+#         # Bottleneck
+#         # self.conv6 = ResBlockM(512, 512, kernel_size=4, stride=1, padding=3, dilation=2, with_affine=affine,
+#         #                        use_batch=use_batch)
+#
+#         # Upsampling
+#
+#         self.up1 = UpConvM(512, 256, use_batchnorm=use_batchnorm)
+#         self.up_c1 = GhostModuleM(512, 256, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+#
+#         self.up2 = UpConvM(256, 128, use_batchnorm=use_batchnorm)
+#         self.up_c2 = GhostModuleM(256, 128, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+#
+#         self.up3 = UpConvM(128, 64, use_batchnorm=use_batchnorm)
+#         self.up_c3 = GhostModuleM(128, 64, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+#
+#         self.up4 = UpConvM(64, 32, use_batchnorm=use_batchnorm)
+#         self.up_c4 = GhostModuleM(64, 32, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+#
+#         self.pred = nn.Conv2d(32, out_channels, kernel_size=(1, 1), stride=(1, 1), padding=0)
+#
+#         self.deblur = DeBlur()
+#
+#     def forward(self, x):
+#         x1 = self.conv1(x)  # [1, 32, 400, 400]
+#         x1_pool = self.pool(x1)  # [1, 32, 200, 200]
+#
+#         x2 = self.conv2(x1_pool)  # [1, 64, 200, 200]
+#         x2_pool = self.pool(x2)  # [1, 64, 100, 100]
+#
+#         x3 = self.conv3(x2_pool)  # [1, 128, 100, 100]
+#         x3_pool = self.pool(x3)  # [1, 128, 50, 50]
+#
+#         x4 = self.conv4(x3_pool)  # [1, 256, 50, 50]
+#         x4_pool = self.pool(x4)  # [1, 256, 25, 25]
+#
+#         # bottle_neck
+#         x5 = self.conv5(x4_pool)  # [1, 512, 25, 25]
+#
+#         x7 = self.up1(x5)  # [1, 256, 50, 50]
+#         x7 = torch.cat((x4, x7), dim=1)  # [1, 512, 50, 50]
+#         x7 = self.up_c1(x7)  # [1, 256, 50, 50])
+#
+#         x8 = self.up2(x7)  # [1, 128, 100, 100]
+#         x8 = torch.cat((x3, x8), dim=1)  # [1, 256, 100, 100]
+#         x8 = self.up_c2(x8)  # [1, 128, 100, 100]
+#
+#         x9 = self.up3(x8)  # [1, 64, 200, 200]]
+#         x9 = torch.cat((x2, x9), dim=1)  # [1, 128, 200, 200]
+#         x9 = self.up_c3(x9)  # [1, 64, 200, 200]
+#
+#         x10 = self.up4(x9)  # [1, 32, 400, 400]
+#         x10 = torch.cat((x1, x10), dim=1)  # [1, 64, 400, 400])
+#         x10 = self.up_c4(x10)  # [1, 32, 400, 400]
+#
+#         pred = self.pred(x10)  # [1, 3, 400, 400]
+#
+#         final = self.deblur(pred)
+#
+#         return final
 
-        # Downsampling
-        self.conv1 = GhostModuleM(in_channels, 32, kernel_size=3, stride=1, use_batchnorm=use_batchnorm)
-        self.conv2 = GhostModuleM(32, 64, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
-        self.conv3 = GhostModuleM(64, 128, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
-        self.conv4 = GhostModuleM(128, 256, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
-        self.conv5 = GhostModuleM(256, 512, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
 
-        # Bottleneck
-        # self.conv6 = ResBlockM(512, 512, kernel_size=4, stride=1, padding=3, dilation=2, with_affine=affine,
-        #                        use_batch=use_batch)
-
-        # Upsampling
-
-        self.up1 = UpConvM(512, 256, use_batchnorm=use_batchnorm)
-        self.up_c1 = GhostModuleM(512, 256, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
-
-        self.up2 = UpConvM(256, 128, use_batchnorm=use_batchnorm)
-        self.up_c2 = GhostModuleM(256, 128, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
-
-        self.up3 = UpConvM(128, 64, use_batchnorm=use_batchnorm)
-        self.up_c3 = GhostModuleM(128, 64, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
-
-        self.up4 = UpConvM(64, 32, use_batchnorm=use_batchnorm)
-        self.up_c4 = GhostModuleM(64, 32, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
-
-        self.pred = nn.Conv2d(32, out_channels, kernel_size=(1, 1), stride=(1, 1), padding=0)
-
-        if deblur_weights is None:
-            self.deblur = DeBlur(use_batch=True)
-        else:
-            print("loading deblur weights")
-            self.deblur = DeBlur(use_batch=True)
-            weights = torch.load(deblur_weights)
-            self.deblur = load_checkpoint(weights, self.deblur)
-            # net = net.to(cfg.DEVICE)
-
-    def forward(self, x):
-        x1 = self.conv1(x)  # [1, 32, 400, 400]
-        x1_pool = self.pool(x1)  # [1, 32, 200, 200]
-
-        x2 = self.conv2(x1_pool)  # [1, 64, 200, 200]
-        x2_pool = self.pool(x2)  # [1, 64, 100, 100]
-
-        x3 = self.conv3(x2_pool)  # [1, 128, 100, 100]
-        x3_pool = self.pool(x3)  # [1, 128, 50, 50]
-
-        x4 = self.conv4(x3_pool)  # [1, 256, 50, 50]
-        x4_pool = self.pool(x4)  # [1, 256, 25, 25]
-
-        # bottle_neck
-        x5 = self.conv5(x4_pool)  # [1, 512, 25, 25]
-
-        x7 = self.up1(x5)  # [1, 256, 50, 50]
-        x7 = torch.cat((x4, x7), dim=1)  # [1, 512, 50, 50]
-        x7 = self.up_c1(x7)  # [1, 256, 50, 50])
-
-        x8 = self.up2(x7)  # [1, 128, 100, 100]
-        x8 = torch.cat((x3, x8), dim=1)  # [1, 256, 100, 100]
-        x8 = self.up_c2(x8)  # [1, 128, 100, 100]
-
-        x9 = self.up3(x8)  # [1, 64, 200, 200]]
-        x9 = torch.cat((x2, x9), dim=1)  # [1, 128, 200, 200]
-        x9 = self.up_c3(x9)  # [1, 64, 200, 200]
-
-        x10 = self.up4(x9)  # [1, 32, 400, 400]
-        x10 = torch.cat((x1, x10), dim=1)  # [1, 64, 400, 400])
-        x10 = self.up_c4(x10)  # [1, 32, 400, 400]
-
-        pred = self.pred(x10)  # [1, 3, 400, 400]
-
-        final = self.deblur(pred)
-
-        return final
+# class Network7DeBlur2(nn.Module):
+#     def __init__(self, in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False, deblur_weights=None):
+#         """
+#         Initializes each part of the convolutional neural network.
+#         """
+#         super().__init__()
+#         self.pool = nn.MaxPool2d(2, 2)
+#
+#         # Downsampling
+#         self.conv1 = GhostModuleM(in_channels, 32, kernel_size=3, stride=1, use_batchnorm=use_batchnorm)
+#         self.conv2 = GhostModuleM(32, 64, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+#         self.conv3 = GhostModuleM(64, 128, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+#         self.conv4 = GhostModuleM(128, 256, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+#         self.conv5 = GhostModuleM(256, 512, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+#
+#         # Bottleneck
+#         # self.conv6 = ResBlockM(512, 512, kernel_size=4, stride=1, padding=3, dilation=2, with_affine=affine,
+#         #                        use_batch=use_batch)
+#
+#         # Upsampling
+#
+#         self.up1 = UpConvM(512, 256, use_batchnorm=use_batchnorm)
+#         self.up_c1 = GhostModuleM(512, 256, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+#
+#         self.up2 = UpConvM(256, 128, use_batchnorm=use_batchnorm)
+#         self.up_c2 = GhostModuleM(256, 128, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+#
+#         self.up3 = UpConvM(128, 64, use_batchnorm=use_batchnorm)
+#         self.up_c3 = GhostModuleM(128, 64, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+#
+#         self.up4 = UpConvM(64, 32, use_batchnorm=use_batchnorm)
+#         self.up_c4 = GhostModuleM(64, 32, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+#
+#         self.pred = nn.Conv2d(32, out_channels, kernel_size=(1, 1), stride=(1, 1), padding=0)
+#
+#         if deblur_weights is None:
+#             self.deblur = DeBlur(use_batch=True)
+#         else:
+#             print("loading deblur weights")
+#             self.deblur = DeBlur(use_batch=True)
+#             weights = torch.load(deblur_weights)
+#             self.deblur = load_checkpoint(weights, self.deblur)
+#             # net = net.to(cfg.DEVICE)
+#
+#     def forward(self, x):
+#         x1 = self.conv1(x)  # [1, 32, 400, 400]
+#         x1_pool = self.pool(x1)  # [1, 32, 200, 200]
+#
+#         x2 = self.conv2(x1_pool)  # [1, 64, 200, 200]
+#         x2_pool = self.pool(x2)  # [1, 64, 100, 100]
+#
+#         x3 = self.conv3(x2_pool)  # [1, 128, 100, 100]
+#         x3_pool = self.pool(x3)  # [1, 128, 50, 50]
+#
+#         x4 = self.conv4(x3_pool)  # [1, 256, 50, 50]
+#         x4_pool = self.pool(x4)  # [1, 256, 25, 25]
+#
+#         # bottle_neck
+#         x5 = self.conv5(x4_pool)  # [1, 512, 25, 25]
+#
+#         x7 = self.up1(x5)  # [1, 256, 50, 50]
+#         x7 = torch.cat((x4, x7), dim=1)  # [1, 512, 50, 50]
+#         x7 = self.up_c1(x7)  # [1, 256, 50, 50])
+#
+#         x8 = self.up2(x7)  # [1, 128, 100, 100]
+#         x8 = torch.cat((x3, x8), dim=1)  # [1, 256, 100, 100]
+#         x8 = self.up_c2(x8)  # [1, 128, 100, 100]
+#
+#         x9 = self.up3(x8)  # [1, 64, 200, 200]]
+#         x9 = torch.cat((x2, x9), dim=1)  # [1, 128, 200, 200]
+#         x9 = self.up_c3(x9)  # [1, 64, 200, 200]
+#
+#         x10 = self.up4(x9)  # [1, 32, 400, 400]
+#         x10 = torch.cat((x1, x10), dim=1)  # [1, 64, 400, 400])
+#         x10 = self.up_c4(x10)  # [1, 32, 400, 400]
+#
+#         pred = self.pred(x10)  # [1, 3, 400, 400]
+#
+#         final = self.deblur(pred)
+#
+#         return final
 
 
 class Network7Att(nn.Module):
@@ -648,7 +806,7 @@ class Network7L(nn.Module):
         x4_pool = self.pool(x4)  # [1, 512, 25, 25]
 
         # bottle_neck
-        x5 = self.conv5(x4_pool)  # [1, 1024, 25, 25]
+        x5 = self.conv5(x4_pool)  # [1, 1024, 12, 12]
 
         x7 = self.up5(x5)  # [1, 512, 50, 50]
         x7 = torch.cat((x4, x7), dim=1)  # [1, 512, 50, 50]
@@ -671,96 +829,191 @@ class Network7L(nn.Module):
         return head
 
 
-class DeBlur(nn.Module):
-    def __init__(self, in_channels=3, out_channels=3, dropout=0.2, use_batch=False):
-        super(DeBlur, self).__init__()
-
+class SCNetwork7L(nn.Module):
+    def __init__(self, in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=True):
+        """
+        Initializes each part of the convolutional neural network.
+        """
+        super().__init__()
         self.pool = nn.MaxPool2d(2, 2)
 
-        self.conv1 = ResBlockM(in_channels, 32, kernel_size=3, stride=1, padding=1, dropout=dropout,
-                               padding_mode='reflect')
-        self.conv2 = ResBlockM(32, 64, kernel_size=3, stride=1, padding=1, dropout=dropout)
-        self.conv3 = ResBlockM(64, 128, kernel_size=3, stride=1, padding=1, dropout=dropout)
+        # Downsampling
+        self.conv1 = GhostModuleM(in_channels, 64, kernel_size=3, stride=1, use_batchnorm=use_batchnorm)
+        self.conv2 = GhostModuleM(64, 128, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+        self.conv3 = GhostModuleM(128, 256, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+        self.conv4 = GhostModuleM(256, 512, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+        self.conv5 = GhostModuleM(512, 1024, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+
+        self.spatial_att = SpatialAttention()
+        self.channel_att = ChannelAttention(ch=1024)
+
+        # Bottleneck
+        # self.conv6 = ResBlockM(512, 512, kernel_size=4, stride=1, padding=3, dilation=2, with_affine=affine,
+        #                        use_batch=use_batch)
 
         # Upsampling
-        self.up1 = UpConvM(128, 64, use_batchnorm=use_batch)
-        self.up_c1 = ResBlockM(128, 64, kernel_size=3, stride=1, padding=1, dropout=dropout)
 
-        self.up2 = UpConvM(64, 32, use_batchnorm=use_batch)
-        self.up_c2 = ResBlockM(64, 32, kernel_size=3, stride=1, padding=1, dropout=dropout)
+        self.up1 = UpConvM(512, 256, use_batchnorm=use_batchnorm)
+        self.up_c1 = GhostModuleM(512, 256, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+
+        self.up2 = UpConvM(256, 128, use_batchnorm=use_batchnorm)
+        self.up_c2 = GhostModuleM(256, 128, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+
+        self.up3 = UpConvM(128, 64, use_batchnorm=use_batchnorm)
+        self.up_c3 = GhostModuleM(128, 64, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
+
+        self.up4 = UpConvM(64, 32, use_batchnorm=use_batchnorm)
+        self.up_c4 = GhostModuleM(64, 32, kernel_size=3, stride=1, dropout=dropout, use_batchnorm=use_batchnorm)
 
         self.head = nn.Conv2d(32, out_channels, kernel_size=(1, 1), stride=(1, 1), padding=0)
 
     def forward(self, x):
         x1 = self.conv1(x)  # [1, 32, 400, 400]
+
         x1_pool = self.pool(x1)  # [1, 32, 200, 200]
-
         x2 = self.conv2(x1_pool)  # [1, 64, 200, 200]
-        x2_pool = self.pool(x2)  # [1, 64, 100, 100]
 
+        x2_pool = self.pool(x2)  # [1, 64, 100, 100]
         x3 = self.conv3(x2_pool)  # [1, 128, 100, 100]
 
-        x4 = self.up1(x3)  # [1, 46, 200, 200]
-        x4 = torch.cat((x2, x4), dim=1)  # [1, 128, 200, 200]
-        x4 = self.up_c1(x4)  # [1, 64, 200, 200]
+        x3_pool = self.pool(x3)  # [1, 128, 50, 50]
+        x4 = self.conv4(x3_pool)  # [1, 256, 50, 50]
 
-        x5 = self.up2(x4)  # [1, 32, 400, 400]
-        x5 = torch.cat((x1, x5), dim=1)  # [1, 64, 400, 400]
-        x5 = self.up_c2(x5)  # [1, 32, 400, 400]
+        x4_pool = self.pool(x4)  # [1, 256, 25, 25]
 
-        out = self.head(x5)
+        # bottle_neck
+        x5 = self.conv5(x4_pool)  # [1, 512, 25, 25]
+        x5 = self.spatial_att(x5)  # [1, 512, 25, 25])
 
-        return out
+        x7 = self.up1(x5)  # [1, 256, 50, 50]
+        x7 = torch.cat((x4, x7), dim=1)  # [1, 512, 50, 50]
+        x7 = self.up_c1(x7)  # [1, 256, 50, 50])
+
+        x8 = self.up2(x7)  # [1, 128, 100, 100]
+        x8 = torch.cat((x3, x8), dim=1)  # [1, 256, 100, 100]
+        x8 = self.up_c2(x8)  # [1, 128, 100, 100]
+
+        x9 = self.up3(x8)  # [1, 64, 200, 200]]
+        x9 = torch.cat((x2, x9), dim=1)  # [1, 128, 200, 200]
+        x9 = self.up_c3(x9)  # [1, 64, 200, 200]
+
+        x10 = self.up4(x9)  # [1, 32, 400, 400]
+        x10 = torch.cat((x1, x10), dim=1)  # [1, 64, 400, 400])
+        x10 = self.up_c4(x10)  # [1, 32, 400, 400]
+
+        pred = self.head(x10)  # [1, 3, 400, 400]
+
+        return pred
 
 
-class DeBlur2(nn.Module):
-    def __init__(self, in_channels=3, out_channels=3, dropout=0.2, use_batch=False):
-        super(DeBlur2, self).__init__()
+class NetworkSR(nn.Module):
+    def __init__(self, in_channels=3, num_channels=64, num_blocks=32):
+        super().__init__()
+        self.initial = nn.Conv2d(
+            in_channels,
+            num_channels,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=True,
+        )
+        self.residuals = nn.Sequential(*[RRDB(num_channels) for _ in range(num_blocks)])
+        self.conv = nn.Conv2d(num_channels, num_channels, kernel_size=3, stride=1, padding=1)
 
-        self.pool = nn.MaxPool2d(2, 2)
+        # self.upsamples = nn.Sequential(
+        #     UpsampleBlock(num_channels),
+        #     UpsampleBlock(num_channels),
+        # )
 
-        self.conv1 = ResBlockM(in_channels, 32, kernel_size=3, stride=1, padding=1, dropout=dropout,
-                               padding_mode='reflect')
-        self.conv2 = ResBlockM(32, 64, kernel_size=3, stride=1, padding=1, dropout=dropout)
-        self.conv3 = ResBlockM(64, 128, kernel_size=3, stride=1, padding=1, dropout=dropout)
-
-        # Upsampling
-        self.up1 = UpConvM(128, 64, use_batchnorm=use_batch)
-        self.up_c1 = ResBlockM(128, 64, kernel_size=3, stride=1, padding=1, dropout=dropout)
-
-        self.up2 = UpConvM(64, 32, use_batchnorm=use_batch)
-        self.up_c2 = ResBlockM(64, 32, kernel_size=3, stride=1, padding=1, dropout=dropout)
-
-        self.head = nn.Conv2d(32, out_channels, kernel_size=(1, 1), stride=(1, 1), padding=0)
+        self.final = nn.Sequential(
+            nn.Conv2d(num_channels, num_channels, 3, 1, 1, bias=True),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(num_channels, in_channels, 3, 1, 1, bias=True),
+        )
 
     def forward(self, x):
-        x1 = self.conv1(x)  # [1, 32, 400, 400]
-        x1_pool = self.pool(x1)  # [1, 32, 200, 200]
+        initial = self.initial(x)
+        x = self.conv(self.residuals(initial)) + initial
+        # x = self.upsamples(x)
+        return self.final(x)
 
-        x2 = self.conv2(x1_pool)  # [1, 64, 200, 200]
-        x2_pool = self.pool(x2)  # [1, 64, 100, 100]
 
-        x3 = self.conv3(x2_pool)  # [1, 128, 100, 100]
+class NetworkSR2(nn.Module):
+    def __init__(self, in_channels=3, num_channels=64, num_blocks=4):
+        super().__init__()
+        self.initial = nn.Conv2d(
+            in_channels,
+            num_channels,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=True,
+        )
+        self.residuals = nn.Sequential(*[RRDB2(num_channels) for _ in range(num_blocks)])
+        self.conv = nn.Conv2d(num_channels, num_channels, kernel_size=3, stride=1, padding=1)
 
-        x4 = self.up1(x3)  # [1, 46, 200, 200]
-        x4 = torch.cat((x2, x4), dim=1)  # [1, 128, 200, 200]
-        x4 = self.up_c1(x4)  # [1, 64, 200, 200]
+        # self.upsamples = nn.Sequential(
+        #     UpsampleBlock(num_channels),
+        #     UpsampleBlock(num_channels),
+        # )
 
-        x5 = self.up2(x4)  # [1, 32, 400, 400]
-        x5 = torch.cat((x1, x5), dim=1)  # [1, 64, 400, 400]
-        x5 = self.up_c2(x5)  # [1, 32, 400, 400]
+        self.final = nn.Sequential(
+            nn.Conv2d(num_channels, num_channels, 3, 1, 1, bias=True),
+            nn.ReLU(),
+            nn.Conv2d(num_channels, in_channels, 3, 1, 1, bias=True),
+        )
 
-        out = self.head(x5)
+    def forward(self, x):
+        initial = self.initial(x)
+        x = self.conv(self.residuals(initial)) + initial
+        # x = self.upsamples(x)
+        return self.final(x)
 
-        return out
+
+class NetworkSR3(nn.Module):
+    def __init__(self, in_channels=3, num_channels=64, num_blocks=4):
+        super().__init__()
+        self.initial = nn.Conv2d(
+            in_channels,
+            num_channels,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=True,
+        )
+        self.residuals = nn.Sequential(*[RRDB3(num_channels) for _ in range(num_blocks)])
+        self.conv = nn.Conv2d(num_channels, num_channels, kernel_size=3, stride=1, padding=1)
+
+        # self.upsamples = nn.Sequential(
+        #     UpsampleBlock(num_channels),
+        #     UpsampleBlock(num_channels),
+        # )
+
+        self.final = nn.Sequential(
+            nn.Conv2d(num_channels, num_channels, 3, 1, 1, bias=True),
+            nn.ReLU(),
+            nn.Conv2d(num_channels, in_channels, 3, 1, 1, bias=True),
+        )
+
+    def forward(self, x):
+        initial = self.initial(x)
+        x = self.conv(self.residuals(initial)) + initial
+        # x = self.upsamples(x)
+        return self.final(x)
 
 
 def test():
-    x = torch.randn((1, 3, 400, 400))
-    # model = Network7(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False)
-    model = DeBlur()  # in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=True)
+    x = torch.randn((1, 3, 256, 256))
+    # model = SCNetwork7(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=True)
+    # model = Network7Att()  # in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=True)
+    model = Network7L()
+
+    start = time.time()
     preds = model(x)
+    end = time.time()
+
     print(preds.shape)
+    print("inf time:", end - start)
 
 
 if __name__ == "__main__":

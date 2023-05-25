@@ -210,9 +210,273 @@ class GhostModuleM(nn.Module):
         return out[:, :self.oup, :, :]
 
 
+#####################################################################################################################
+
+class ConvBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, use_act, **kwargs):
+        super().__init__()
+        self.cnn = nn.Conv2d(
+            in_channels,
+            out_channels,
+            **kwargs,
+            bias=True,
+        )
+        self.act = nn.LeakyReLU(0.2, inplace=True) if use_act else nn.Identity()
+
+    def forward(self, x):
+        return self.act(self.cnn(x))
+
+
+class UpsampleBlock(nn.Module):
+    def __init__(self, in_c, scale_factor=2):
+        super().__init__()
+        self.upsample = nn.Upsample(scale_factor=scale_factor, mode="nearest")
+        self.conv = nn.Conv2d(in_c, in_c, 3, 1, 1, bias=True)
+        self.act = nn.LeakyReLU(0.2, inplace=True)
+
+    def forward(self, x):
+        return self.act(self.conv(self.upsample(x)))
+
+
+class DenseResidualBlock(nn.Module):
+    def __init__(self, in_channels, channels=32, residual_beta=0.2):
+        super().__init__()
+        self.residual_beta = residual_beta
+        self.blocks = nn.ModuleList()
+
+        for i in range(5):
+            self.blocks.append(
+                ConvBlock(
+                    in_channels + channels * i,
+                    channels if i <= 3 else in_channels,
+                    kernel_size=3,
+                    stride=1,
+                    padding=1,
+                    use_act=True if i <= 3 else False,
+                )
+            )
+
+    def forward(self, x):
+        new_inputs = x
+        for block in self.blocks:
+            out = block(new_inputs)
+            new_inputs = torch.cat([new_inputs, out], dim=1)
+        return self.residual_beta * out + x
+
+
+class RRDB(nn.Module):
+    def __init__(self, in_channels, residual_beta=0.2):
+        super().__init__()
+        self.residual_beta = residual_beta
+        self.rrdb = nn.Sequential(*[DenseResidualBlock(in_channels) for _ in range(3)])
+
+    def forward(self, x):
+        return self.rrdb(x) * self.residual_beta + x
+
+
+######################################################################################################################
+class ConvBlock2(nn.Module):
+    def __init__(self, in_channels, out_channels, use_act, **kwargs):
+        super().__init__()
+        self.cnn = nn.Conv2d(in_channels, out_channels, **kwargs, bias=True)
+        self.act = nn.ReLU() if use_act else nn.Identity()
+
+    def forward(self, x):
+        return self.act(self.cnn(x))
+
+
+class ConvBlock3(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super().__init__()
+        self.cnn = nn.Conv2d(in_channels, out_channels, **kwargs, bias=True)
+        self.cnn2 = nn.Conv2d(out_channels, out_channels, **kwargs, bias=True)
+        self.cbam = CBAM(out_channels)
+        self.act = nn.ReLU()
+
+    def forward(self, x):
+        x = self.cnn(x)
+        x = self.cbam(x)
+        x = self.cnn2(x)
+        return self.act(x)
+
+
+class UpsampleBlock2(nn.Module):
+    def __init__(self, in_c, scale_factor=2):
+        super().__init__()
+        self.upsample = nn.Upsample(scale_factor=scale_factor, mode="nearest")
+        self.conv = nn.Conv2d(in_c, in_c, 3, 1, 1, bias=True)
+        self.act = nn.ReLU()
+
+    def forward(self, x):
+        return self.act(self.conv(self.upsample(x)))
+
+
+class DenseResidualBlock2(nn.Module):
+    def __init__(self, in_channels, channels=32, residual_beta=0.2):
+        super().__init__()
+        self.residual_beta = residual_beta
+        self.blocks = nn.ModuleList()
+
+        for i in range(5):
+            self.blocks.append(
+                ConvBlock2(
+                    in_channels=in_channels + channels * i,
+                    out_channels=channels if i <= 3 else in_channels,
+                    kernel_size=3,
+                    stride=1,
+                    padding=1,
+                    use_act=True if i <= 3 else False,
+                )
+            )
+
+    def forward(self, x):
+        new_inputs = x
+        for block in self.blocks:
+            out = block(new_inputs)
+            new_inputs = torch.cat([new_inputs, out], dim=1)
+        return self.residual_beta * out + x
+
+
+class DenseResidualBlock3(nn.Module):
+    def __init__(self, in_channels, channels=32, residual_beta=0.2):
+        super().__init__()
+        self.residual_beta = residual_beta
+        self.blocks = nn.ModuleList()
+
+        for i in range(5):
+            self.blocks.append(
+                ConvBlock3(
+                    in_channels=in_channels + channels * i,
+                    out_channels=channels if i <= 3 else in_channels,
+                    kernel_size=3,
+                    stride=1,
+                    padding=1,
+                )
+            )
+
+    def forward(self, x):
+        new_inputs = x
+        for block in self.blocks:
+            out = block(new_inputs)
+            new_inputs = torch.cat([new_inputs, out], dim=1)
+        return self.residual_beta * out + x
+
+
+class RRDB2(nn.Module):
+    def __init__(self, in_channels, residual_beta=0.2):
+        super().__init__()
+        self.residual_beta = residual_beta
+        self.rrdb = nn.Sequential(*[DenseResidualBlock2(in_channels) for _ in range(3)])
+
+    def forward(self, x):
+        return self.rrdb(x) * self.residual_beta + x
+
+
+class RRDB3(nn.Module):
+    def __init__(self, in_channels, residual_beta=0.2):
+        super().__init__()
+        self.residual_beta = residual_beta
+        self.rrdb = nn.Sequential(*[DenseResidualBlock3(in_channels) for _ in range(3)])
+
+    def forward(self, x):
+        return self.rrdb(x) * self.residual_beta + x
+
+
+######################################################################################################################
+class ChannelAttention(nn.Module):
+    def __init__(self, ch=32, ratio=8):
+        super().__init__()
+
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+
+        self.mlp = nn.Sequential(
+            nn.Linear(ch, ch // ratio, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(ch // ratio, ch, bias=False)
+        )
+
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x1 = self.avg_pool(x).squeeze(-1).squeeze(-1)
+        x1 = self.mlp(x1)
+
+        x2 = self.max_pool(x).squeeze(-1).squeeze(-1)
+        x2 = self.mlp(x2)
+
+        feats = x1 + x2
+        feats = self.sigmoid(feats).unsqueeze(-1).unsqueeze(-1)
+        refined_feats = x * feats
+
+        return refined_feats
+
+
+class CBAM(nn.Module):
+    def __init__(self, in_channels):
+        super().__init__()
+
+        self.ca = ChannelAttention(in_channels)
+        self.sa = SpatialAttention()
+
+    def forward(self, x):
+        x = self.ca(x)
+        x = self.sa(x)
+        return x
+
+
+class SpatialAttention(nn.Module):
+    def __init__(self, kernel_size=7):
+        super().__init__()
+
+        self.conv = nn.Conv2d(2, 1, kernel_size, padding=3, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x1 = torch.mean(x, dim=1, keepdim=True)
+        x2, _ = torch.max(x, dim=1, keepdim=True)
+
+        feats = torch.cat([x1, x2], dim=1)
+        feats = self.conv(feats)
+        feats = self.sigmoid(feats)
+        refined_feats = x * feats
+
+        return refined_feats
+
+
+class ca_stem_block(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1):
+        super().__init__()
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, stride=stride),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, stride=1)
+        )
+
+        # CA
+        self.channel_att = ChannelAttention(ch=64, ratio=16)
+
+        self.shortcut = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 3, 1, stride),
+            nn.BatchNorm2d(out_channels)
+        )
+
+    def forward(self, x):
+        # Shortcut
+        a = self.conv(x)
+        a = self.channel_att(a)
+
+        b = self.shortcut(x)
+        print(b.shape)
+        return a + b
+
+
 def test():
-    x = torch.randn((1, 64, 256, 256))
-    net = GhostModuleM(inp=64, oup=256, kernel_size=3, ratio=2, dw_size=3, stride=1)
+    x = torch.randn((1, 64, 100, 100))
+    # net = GhostModuleM(inp=64, oup=256, kernel_size=3, ratio=2, dw_size=3, stride=1)
+    net = CBAM(in_channels=64)
     preds = net(x)
 
     print(preds.shape)

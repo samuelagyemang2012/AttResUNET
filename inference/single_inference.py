@@ -5,20 +5,27 @@ import torchvision.transforms as transforms
 import cv2
 from PIL import Image
 import numpy as np
+from skimage.metrics import structural_similarity as ssim
+from metrics import metrics
 
 # load model
 separate = False
 
-weights_path = "../res/net7_snow_large/best_snow_large_ploss_vgg19_net7_checkpoint.pth.tar"
-deblur_weights_path = "../res/deblur_large/best_deblur_large_myloss_ploss_vgg19_net7_checkpoint.pth.tar"
-
 if not separate:
-    net = Network7(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False)
+    print("one model")
+    weights_path = "../res/train18/best_netsr_b4_sa_myloss_ploss_vgg19_net7_checkpoint.pth.tar"
+
+    net = NetworkSR3(num_blocks=4)
+    # net = Network7(use_batchnorm=False)
+    # net = NetworkSR2(num_blocks=8)
     weights = torch.load(weights_path)
     net = load_checkpoint(weights, net)
 else:
-    net = Network7(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False)
-    refine_net = DeBlur(use_batch=True)
+    weights_path = "../res/netsr2_b8/best_netsr2_b8_myloss_ploss_vgg19_net7_checkpoint.pth.tar"
+    deblur_weights_path = "../res/train17/best_deblur_netL_mse_checkpoint.pth.tar"
+
+    net = NetworkSR2(num_blocks=8)  # Network7Att(, use_batchnorm=False)
+    refine_net = Network7L(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=True)
 
     model_weights = torch.load(weights_path)
     net = load_checkpoint(model_weights, net)
@@ -26,8 +33,8 @@ else:
     refine_weights = torch.load(deblur_weights_path)
     refine_net = load_checkpoint(refine_weights, refine_net)
 
-img_clear_path = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data/test/clear/beautiful_smile_04354.jpg"
-img_deg_path = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data/test/deg/beautiful_smile_04354.jpg"  # /datasets/dehaze/reside/SOTs/training_data/SOTS/train/hazy/0003.jpg"
+img_clear_path = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/test2/clear/winter_building_04993.jpg"
+img_deg_path = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/test2/deg/winter_building_04993.jpg"  # /datasets/dehaze/reside/SOTs/training_data/SOTS/train/hazy/0003.jpg"
 
 transform = transforms.Compose([
     transforms.Resize((400, 400)),
@@ -46,37 +53,6 @@ def resize(arr, w, h):
     return arr
 
 
-def temperature(image, temp):
-    kelvin_table = {
-        1000: (255, 56, 0),
-        1500: (255, 109, 0),
-        2000: (255, 137, 18),
-        2500: (255, 161, 72),
-        3000: (255, 180, 107),
-        3500: (255, 196, 137),
-        4000: (255, 209, 163),
-        4500: (255, 219, 186),
-        5000: (255, 228, 206),
-        5500: (255, 236, 224),
-        6000: (255, 243, 239),
-        6500: (255, 249, 253),
-        7000: (245, 243, 255),
-        7500: (235, 238, 255),
-        8000: (227, 233, 255),
-        8500: (220, 229, 255),
-        9000: (214, 225, 255),
-        9500: (208, 222, 255),
-        10000: (204, 219, 255)}
-
-    x = Image.fromarray(np.uint8(image * 255))
-    r, g, b = kelvin_table[temp]
-    matrix = (r / 255.0, 0.0, 0.0, 0.0,
-              0.0, g / 255.0, 0.0, 0.0,
-              0.0, 0.0, b / 255.0, 0.0)
-    x = x.convert('RGB', matrix)
-    x.show()
-
-
 def single_inference():
     gt = cv2.imread(img_clear_path)
     gt = resize(gt, 400, 400)
@@ -89,16 +65,28 @@ def single_inference():
     # do inference
     if not separate:
         net.eval()
+        start = time.time()
         preds = net(input)
+        end = time.time()
     else:
         net.eval()
+
+        start = time.time()
         clean = net(input)
         preds = refine_net(clean)
+        end = time.time()
 
     preds = process_tensor(preds)
 
     input = process_tensor(input)
     # input = resize(input, w, h)
+    ssim = metrics.get_SSIM(input, preds, is_multichannel=True)
+    psnr = metrics.get_psnr(input, preds, max_value=1.0)
+    inf_time = end - start
+
+    print("inf_time:", inf_time)
+    print("ssim:", ssim)
+    print("psnr:", psnr)
 
     cv2.imshow("groundtruth", gt)
     cv2.imshow("deg", input)

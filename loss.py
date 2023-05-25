@@ -130,7 +130,7 @@ class MyLoss(nn.Module):
         pl = self.vgg16loss(pred, target)
 
         # mse + lssim + perceptual loss
-        return mse + ssim_loss + (0.3 * pl)
+        return mse + ssim_loss + (0.006 * pl)
 
 
 class MSESSIM(nn.Module):

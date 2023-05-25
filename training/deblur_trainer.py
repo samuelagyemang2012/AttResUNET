@@ -8,12 +8,12 @@ from albumentations.pytorch import ToTensorV2
 from torch.utils.data import DataLoader
 import albumentations as A
 from models.model import *
-from dataset_cv import Data
+from dataset_cv import Data, ImageDataset
 from early_stopping import EarlyStopping
 from model_checkpoint import ModelCheckpoint
 from lion_pytorch import Lion
 from torch.optim import Adam
-# from loss import MyLoss, MSESSIM
+from loss import MyLoss, MSESSIM
 import cv2
 from utils import save_checkpoint
 from torchmetrics.functional import structural_similarity_index_measure, peak_signal_noise_ratio
@@ -53,7 +53,8 @@ def save_img(arr, path):
 
 def save_results(arr, path):
     df = pd.DataFrame(arr,
-                      columns=["Epoch", "Train_Loss", "Train_SSIM", "Train_PSNR", "Val_Loss", "Val_SSIM", "Val_PSNR"])
+                      columns=["Epoch", "Train_Loss", "Train_SSIM",
+                               "Train_PSNR"])  # , "Val_Loss", "Val_SSIM", "Val_PSNR"])
     df.to_csv(path, index=False)
 
 
@@ -66,31 +67,6 @@ def save_model(net, opt, path):
 
 
 def train():
-    # writer = SummaryWriter()
-
-    # train_transform = A.Compose([
-    #     A.Resize(height=IMAGE_HEIGHT, width=IMAGE_WIDTH),
-    #     # A.Rotate(limit=35, p=1.0),
-    #     A.HorizontalFlip(p=0.5),
-    #     # A.VerticalFlip(p=0.1),
-    #     A.Normalize(
-    #         mean=[0.0, 0.0, 0.0],
-    #         std=[1.0, 1.0, 1.0],
-    #         max_pixel_value=255.0,
-    #     ),
-    #     ToTensorV2()
-    # ])
-
-    # val_transform = A.Compose([
-    #     A.Resize(height=IMAGE_HEIGHT, width=IMAGE_WIDTH),
-    #     A.Normalize(
-    #         mean=[0.0, 0.0, 0.0],
-    #         std=[1.0, 1.0, 1.0],
-    #         max_pixel_value=255.0,
-    #     ),
-    #     ToTensorV2(),
-    # ])
-
     save_path = init(cfg.RES_DIR)
 
     train_step_loss = []
@@ -111,11 +87,11 @@ def train():
 
     info = []
 
-    model_name = "deblur_myloss_ploss_vgg19_net7_checkpoint.pth.tar"
+    model_name = "deblur_netL_mse_checkpoint.pth.tar"  # "deblur_netL_myloss_ploss_vgg19_net7_checkpoint.pth.tar"
 
     if not cfg.LOAD_MODEL:
         print("creating model")
-        net = DeBlur(use_batch=True).to(cfg.DEVICE)
+        net = Network7L(use_batchnorm=True).to(cfg.DEVICE)  # NetworkSR2(num_blocks=4).to(cfg.DEVICE)
     else:
         pass
         # print("loading checkpoint")
@@ -126,20 +102,19 @@ def train():
         # net = net.to(cfg.DEVICE)
 
     print("preparing data")
-    train_dataset = Data(clear_imgs_dir=cfg.TRAIN_CLEAR_DIR, deg_imgs_dir=cfg.TRAIN_DEG_DIR)
-    val_dataset = Data(clear_imgs_dir=cfg.VAL_CLEAR_DIR, deg_imgs_dir=cfg.VAL_CLEAR_DIR)
+    train_dataset = ImageDataset(clear_imgs_dir=cfg.TRAIN_CLEAR_DIR, deg_imgs_dir=cfg.TRAIN_DEG_DIR, resize_dim=400)
+    # val_dataset = Data(clear_imgs_dir=cfg.VAL_CLEAR_DIR, deg_imgs_dir=cfg.VAL_CLEAR_DIR)
 
     train_loader = DataLoader(dataset=train_dataset, batch_size=cfg.BATCH_SIZE, shuffle=True,
                               num_workers=cfg.NUM_WORKERS)
-    val_loader = DataLoader(dataset=val_dataset, batch_size=cfg.BATCH_SIZE, shuffle=True, num_workers=cfg.NUM_WORKERS)
+    # val_loader = DataLoader(dataset=val_dataset, batch_size=cfg.BATCH_SIZE, shuffle=True, num_workers=cfg.NUM_WORKERS)
 
     print("setting criterion and opt")
-    criterion = nn.MSELoss().to(cfg.DEVICE)
+    criterion = nn.MSELoss().to(cfg.DEVICE)  # MyLoss().to(cfg.DEVICE)
     # criterion = MSESSIM().to(cfg.DEVICE)
 
     lion_opt = Lion(net.parameters(), lr=cfg.LEARNING_RATE, weight_decay=cfg.WEIGHT_DECAY)
     adam_opt = Adam(net.parameters(), lr=cfg.LEARNING_RATE, betas=cfg.ADAM_BETAS)
-
     optimizers = [lion_opt, adam_opt]
 
     print("setting callbacks")
@@ -175,67 +150,74 @@ def train():
             train_step_psnr.append(train_psnr.cpu().detach().item())
 
         # evaluation
-        gc.collect()
-        net.eval()
-        for iteration_val, (img_clear, img_haze) in enumerate(
-                tqdm(val_loader, desc="Epoch " + str(epoch + 1) + " Val")):
-            img_clear = img_clear.to(cfg.DEVICE)
-            img_haze = img_haze.to(cfg.DEVICE)
-
-            # with torch.cuda.amp.autocast():
-            clean_image = net.forward(img_haze)
-            val_loss = criterion(clean_image, img_clear)
-
-            val_ssim = structural_similarity_index_measure(target=img_clear, preds=clean_image, data_range=1.0)
-            val_psnr = peak_signal_noise_ratio(target=img_clear, preds=clean_image)
-
-            val_step_loss.append(val_loss.cpu().detach().item())
-            val_step_ssim.append(val_ssim.cpu().detach().item())
-            val_step_psnr.append(val_psnr.cpu().detach().item())
+        # gc.collect()
+        # net.eval()
+        # for iteration_val, (img_clear, img_haze) in enumerate(
+        #         tqdm(val_loader, desc="Epoch " + str(epoch + 1) + " Val")):
+        #     img_clear = img_clear.to(cfg.DEVICE)
+        #     img_haze = img_haze.to(cfg.DEVICE)
+        #
+        #     # with torch.cuda.amp.autocast():
+        #     clean_image = net.forward(img_haze)
+        #     val_loss = criterion(clean_image, img_clear)
+        #
+        #     val_ssim = structural_similarity_index_measure(target=img_clear, preds=clean_image, data_range=1.0)
+        #     val_psnr = peak_signal_noise_ratio(target=img_clear, preds=clean_image)
+        #
+        #     val_step_loss.append(val_loss.cpu().detach().item())
+        #     val_step_ssim.append(val_ssim.cpu().detach().item())
+        #     val_step_psnr.append(val_psnr.cpu().detach().item())
 
         # save image at interval
         if epoch % cfg.INTERVAL == 0:
-            save_img(clean_image, "test/dehaze_" + str(epoch) + ".jpg", )
+            save_img(clean_image, cfg.SAVE_DIR + "/pred_" + str(epoch) + ".jpg", )
 
         # save information
         train_epoch_loss.append(sum(train_step_loss) / len(train_step_loss))
         train_epoch_ssim.append(sum(train_step_ssim) / len(train_step_ssim))
         train_epoch_psnr.append(sum(train_step_psnr) / len(train_step_psnr))
 
-        val_epoch_loss.append(sum(val_step_loss) / len(val_step_loss))
-        val_epoch_ssim.append(sum(val_step_ssim) / len(val_step_ssim))
-        val_epoch_psnr.append(sum(val_step_psnr) / len(val_step_psnr))
+        # val_epoch_loss.append(sum(val_step_loss) / len(val_step_loss))
+        # val_epoch_ssim.append(sum(val_step_ssim) / len(val_step_ssim))
+        # val_epoch_psnr.append(sum(val_step_psnr) / len(val_step_psnr))
 
         info.append([epoch,
                      train_epoch_loss[epoch],
                      train_epoch_ssim[epoch],
                      train_epoch_psnr[epoch],
-                     val_epoch_loss[epoch],
-                     val_epoch_ssim[epoch],
-                     val_epoch_psnr[epoch]])
+                     # val_epoch_loss[epoch],
+                     # val_epoch_ssim[epoch],
+                     # val_epoch_psnr[epoch]
+                     ])
 
         # log information
-        print('Epoch: {}/{} | Train Loss: {:.6f} | Train SSIM: {:.6f} | Train PSNR: {:.6f} | Val Loss: {:.6f} | Val '
-              'SSIM: {:.6f} | Val PSNR: {:.6f} '.format(epoch + 1, cfg.NUM_EPOCHS,
-                                                        train_epoch_loss[epoch],
-                                                        train_epoch_ssim[epoch],
-                                                        train_epoch_psnr[epoch],
-                                                        val_epoch_loss[epoch],
-                                                        val_epoch_ssim[epoch],
-                                                        val_epoch_psnr[epoch]
-                                                        ))
+        print('Epoch: {}/{} | Train Loss: {:.6f} | Train SSIM: {:.6f} | Train PSNR: {:.6f}'.format(
+            epoch + 1, cfg.NUM_EPOCHS,
+            train_epoch_loss[epoch],
+            train_epoch_ssim[epoch],
+            train_epoch_psnr[epoch]))
+
+        # print('Epoch: {}/{} | Train Loss: {:.6f} | Train SSIM: {:.6f} | Train PSNR: {:.6f} | Val Loss: {:.6f} | Val '
+        #       'SSIM: {:.6f} | Val PSNR: {:.6f} '.format(epoch + 1, cfg.NUM_EPOCHS,
+        #                                                 train_epoch_loss[epoch],
+        #                                                 train_epoch_ssim[epoch],
+        #                                                 train_epoch_psnr[epoch],
+        #                                                 val_epoch_loss[epoch],
+        #                                                 val_epoch_ssim[epoch],
+        #                                                 val_epoch_psnr[epoch]
+        #                                                 ))
 
         save_results(info, save_path + "/results.csv")
 
         # model checkpoint
-        if model_checkpoint(val_epoch_psnr[epoch]):
+        if model_checkpoint(train_epoch_psnr[epoch]):
             name = save_path + "/best_" + model_name
-            print("Val psnr improved from {:.4f} to {:.4f}".format(model_checkpoint.get_last_best(),
-                                                                   val_epoch_psnr[epoch]))
+            print("Train psnr improved from {:.4f} to {:.4f}".format(model_checkpoint.get_last_best(),
+                                                                     train_epoch_psnr[epoch]))
             save_model(net, optimizers[1], name)
 
         # early stopping
-        if early_stopping(val_epoch_psnr[epoch]):
+        if early_stopping(train_epoch_psnr[epoch]):
             name = save_path + "/last_" + model_name
             save_model(net, optimizers[1], name)
 

@@ -6,65 +6,76 @@ import numpy as np
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from PIL import Image
-import torchvision
 import torch
-import matplotlib.pyplot as plt
 import cv2
 from configs import train_config as cfg
+from torchvision import transforms
+import torchvision.transforms.functional as TF
+import random
 
 
-class Test(Dataset):
-    def __init__(self, image_dir, mask_dir, transform=None):
-        self.deg_images = [image_dir + f for f in os.listdir(image_dir) if
-                           f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg')]
+class ImageDataset(Dataset):
+    def __init__(self, clear_imgs_dir, deg_imgs_dir, resize_dim=None):
+        self.clear_imgs_dir = clear_imgs_dir
+        self.deg_imgs_dir = deg_imgs_dir
+        self.resize_dim = resize_dim
 
-        self.clean_images = [mask_dir + f for f in os.listdir(mask_dir) if
-                             f.endswith('.jpg') or f.endswith('.png') or f.endswith('.jpeg')]
+        self.clear_images = [
+            file for file in os.listdir(clear_imgs_dir) if
+            file.endswith('.jpg') or file.endswith('.png') or file.endswith('.jpeg')
+        ]
 
-        # Filter the images to ensure they are counterparts of the same scene
-        self.filter_files()
-        self.size = len(self.deg_images)
+        self.deg_images = [
+            file for file in os.listdir(deg_imgs_dir) if
+            file.endswith('.jpg') or file.endswith('.png') or file.endswith('.jpeg')
+        ]
 
-        self.transform = transform
+        self.both_transform = transforms.Compose(
+            [
+                A.RandomCrop(width=cfg.PATCH_SIZE, height=cfg.PATCH_SIZE),
+                transforms.ToTensor(),
+            ]
+        )
 
-    def filter_files(self):
-        assert len(self.deg_images) == len(self.clean_images)
-        deg_ims = []
-        clean_ims = []
+    def transform(self, clear_image, deg_image, crop_size):
+        # Resize
+        if self.resize_dim is not None:
+            resize = transforms.Resize(size=(cfg.IMAGE_WIDTH, cfg.IMAGE_HEIGHT))
+            clear_image = resize(clear_image)
+            deg_image = resize(deg_image)
 
-        for deg_img_path, clean_img_path in zip(self.deg_images, self.clean_images):
+        # Random crop
+        i, j, h, w = transforms.RandomCrop.get_params(clear_image, output_size=(crop_size, crop_size))
 
-            deg = cv2.imread(deg_img_path)
-            clean = cv2.imread(clean_img_path)
+        clear_image = TF.crop(clear_image, i, j, h, w)
+        deg_image = TF.crop(deg_image, i, j, h, w)
 
-            if deg.size == clean.size:
-                deg_ims.append(deg_img_path)
-                clean_ims.append(clean_img_path)
+        # Random horizontal flipping
+        if random.random() > 0.5:
+            clear_image = TF.hflip(clear_image)
+            deg_image = TF.hflip(deg_image)
 
-        self.deg_images = deg_ims
-        self.clean_images = clean_ims
+        # Random vertical flipping
+        if random.random() > 0.5:
+            clear_image = TF.vflip(clear_image)
+            deg_image = TF.vflip(deg_image)
+
+        # Transform to tensor
+        clear_image = TF.to_tensor(clear_image)
+        deg_image = TF.to_tensor(deg_image)
+        return clear_image, deg_image
 
     def __getitem__(self, index):
-        deg_img = self.rgb_loader(self.deg_images[index])
-        clean_img = self.rgb_loader(self.clean_images[index])
 
-        if self.transform is not None:
-            augmentations = self.transform(image=deg_img, mask=clean_img)
-            deg_img = augmentations["image"]
-            clean_img = augmentations["mask"]
+        clear_img = Image.open(self.clear_imgs_dir + self.clear_images[index]).convert("RGB")
+        deg_img = Image.open(self.deg_imgs_dir + self.deg_images[index]).convert("RGB")
 
-        return deg_img, clean_img
+        img_clear, img_deg = self.transform(clear_img, deg_img, crop_size=cfg.PATCH_SIZE)
 
-    def rgb_loader(self, path):
-        with open(path, 'rb') as f:
-            img = cv2.imread(path)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img = np.array(img).astype(np.float32)
-
-            return img
+        return img_clear.type(torch.float32), img_deg.type(torch.float32)
 
     def __len__(self):
-        return self.size
+        return len(self.clear_images)
 
 
 class Data(Dataset):
@@ -140,26 +151,10 @@ def test():
         cv2.imshow("clear", clear)
         cv2.waitKey(-1)
 
-    train_transform = A.Compose([
-        A.Resize(height=400, width=400),
-        A.Rotate(limit=35, p=1.0),
-        A.HorizontalFlip(p=0.5),
-        A.VerticalFlip(p=0.1),
-        # A.Normalize(
-        #     mean=[0.0, 0.0, 0.0],
-        #     std=[1.0, 1.0, 1.0],
-        # max_pixel_value=255.0,
-        # ),
-        # ToTensorV2()
-    ])
+    TRAIN_DEG_DIR = "C:/Users/Administrator/Desktop/datasets/snow100k/preds/snow_sr/"
+    TRAIN_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/test2/clear/"
 
-    TRAIN_DEG_DIR = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/OTS/training_data/train/hazy/"
-    TRAIN_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/OTS/training_data/train/clear/"
-
-    VAL_HAZY_DIR = "C:/Users/Administrator/Desktop/datasets/SOTs/data/SOTS/val/hazy/"
-    VAL_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/SOTs/data/SOTS/val/clear/"
-
-    train_dataset = Data(clear_imgs_dir=TRAIN_CLEAR_DIR, deg_imgs_dir=TRAIN_DEG_DIR)  # , transform=train_transform)
+    train_dataset = ImageDataset(clear_imgs_dir=TRAIN_CLEAR_DIR, deg_imgs_dir=TRAIN_DEG_DIR, resize_dim=400)
     loader = DataLoader(dataset=train_dataset, batch_size=4, shuffle=True, num_workers=0)
 
     examples = next(iter(loader))
