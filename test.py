@@ -7,6 +7,9 @@ import numpy as np
 import random
 import cv2
 from PIL import Image
+import torchvision.transforms as transforms
+
+import metrics.metrics
 
 """
 Rename files
@@ -240,9 +243,7 @@ def temperature(image, temp):
     return x.convert('RGB', matrix)
 
 
-def eqHist():
-    import cv2
-    # Reading the image
+# Reading the image
 
 
 def ots():
@@ -402,8 +403,56 @@ def snow100k_test():
         shutil.copy(deg_source, deg_dest)
 
 
+def intersection():
+    x_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/OTS/training_data/val/clear/"
+    y_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/OTS/training_data/train/clear/"
+
+    x_files = os.listdir(x_path)
+    y_files = os.listdir(y_path)
+
+    res = set(x_files).intersection(set(y_files))
+    print(len(res))
+    return list(res)
+
+
+def process_tensor(tensor):
+    tensor = tensor.detach().squeeze(0).permute(1, 2, 0).numpy()
+    tensor = cv2.cvtColor(tensor, cv2.COLOR_BGR2RGB)
+    return tensor
+
+
+def get_image_quality(path_img1, path_img2, dim=400):
+    img1 = Image.open(path_img1).convert('RGB')
+    img2 = Image.open(path_img2).convert('RGB')
+
+    transform = transforms.Compose([
+        transforms.Resize((dim, dim)),
+        transforms.ToTensor()
+    ])
+
+    img1 = transform(img1)
+    img1 = img1.unsqueeze(0)
+
+    img2 = transform(img2)
+    img2 = img2.unsqueeze(0)
+
+    img1 = process_tensor(img1)
+    img2 = process_tensor(img2)
+
+    ssim = metrics.metrics.get_SSIM(img1, img2, is_multichannel=True)
+    psnr = metrics.metrics.get_psnr(img1, img2, max_value=1.0)
+
+    print("ssim: ", ssim)
+    print("psnr: ", psnr)
+
+
 if __name__ == "__main__":
-    snow100k_test()
+    path1 = "C:/Users/Administrator/Desktop/city_read_11796.jpg"
+    path2 = "C:/Users/Administrator/Desktop/city_read_11796_ged.jpg"
+    get_image_quality(path1, path2)
+
+    # intersection()
+    # snow100k_test()
     # compare_images()
     # ots()
     # split()

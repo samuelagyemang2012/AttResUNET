@@ -7,6 +7,7 @@ ADAM_BETAS = (0.9, 0.99)
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 1
 INTERVAL = 10
+TOLERANCE = 30
 PATCH_SIZE = 256  # 200
 NUM_EPOCHS = 5000
 NUM_WORKERS = 0
@@ -16,12 +17,16 @@ PIN_MEMORY = True
 LOAD_MODEL = False
 RES_DIR = "../res/"
 SAVE_DIR = "../test/"
-TRAIN_DEG_DIR = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data/train/deg/"
-TRAIN_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data/train/clear/"
 
-VAL_DEG_DIR = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data/val/deg/"
-VAL_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data/val/clear/"
-TOLERANCE = 30
+# "C:/Users/Administrator/Desktop/datasets/dehaze/reside/OTS/training_data/val/hazy/"
+# "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/train/clear/
+
+TRAIN_DEG_DIR = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/train/hazy/"
+TRAIN_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/train/clear/"
+
+VAL_DEG_DIR = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/val/hazy/"
+VAL_CLEAR_DIR = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/val/clear/"
+
 
 # colab
 # RES_DIR = "/content/AttResUNET/res"

@@ -1,6 +1,7 @@
 import torch
 import torchvision
 from torch.utils.data import DataLoader
+import cv2
 
 
 def save_checkpoint(state, filename="dehaze_checkpoint.pth.tar"):
@@ -48,5 +49,7 @@ def get_loaders(dataset, train_dir, train_dir2, val_dir, val_dir2, batch_size, t
     return train_loader, val_loader
 
 
-
-
+def process_tensor(tensor):
+    tensor = tensor.detach().squeeze(0).permute(1, 2, 0).numpy()
+    tensor = cv2.cvtColor(tensor, cv2.COLOR_BGR2RGB)
+    return tensor

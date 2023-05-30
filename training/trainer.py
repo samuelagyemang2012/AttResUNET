@@ -17,7 +17,7 @@ from loss import MyLoss, MSESSIM
 import cv2
 from utils import save_checkpoint
 from torchmetrics.functional import structural_similarity_index_measure, peak_signal_noise_ratio
-from utils import load_checkpoint
+from utils import load_checkpoint, process_tensor
 from configs import train_config as cfg
 import gc
 
@@ -31,12 +31,6 @@ def init(path):
         name = path + "train" + str(len(os.listdir(path)))
         os.mkdir(name + "/")
         return name
-
-
-def process_tensor(tensor):
-    tensor = tensor.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
-    tensor = cv2.cvtColor(tensor, cv2.COLOR_BGR2RGB)
-    return tensor
 
 
 def show_image(arr):
@@ -86,26 +80,21 @@ def train():
 
     info = []
 
-    model_name = "netsr_b4_sa_myloss_ploss_vgg19_net7_checkpoint.pth.tar"
+    model_name = "net7att_haze_sots_ploss_vgg19_checkpoint.pth.tar"
 
     if not cfg.LOAD_MODEL:
         print("creating model")
-        # net = DeBlur(use_batch=True).to(cfg.DEVICE)
-        # net = SCNetwork7(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=True).to(cfg.DEVICE)
-        # net = Network7DeBlur(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False).to(cfg.DEVICE)
-        # net = Network7Att(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=True).to(cfg.DEVICE)
-        net = Network7L(use_batchnorm=True).to(cfg.DEVICE)
-        # net = Network7L(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False).to(cfg.DEVICE)
-        # net = Network5(in_channels=3, out_channels=3).to(cfg.DEVICE)
+        # net = Network7Snow(use_batchnorm=True).to(cfg.DEVICE)
+        net = Network7AttHaze(use_batchnorm=True).to(cfg.DEVICE)
 
-    else:
-        pass
-        print("loading checkpoint")
-        weights_path = "../res/train14/best_net7att_myloss_ploss_vgg19_net7_checkpoint.pth.tar"
-        net = Network7Att(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False).to(cfg.DEVICE)
-        weights = torch.load(weights_path)
-        net = load_checkpoint(weights, net)
-        net = net.to(cfg.DEVICE)
+    # else:
+    #     pass
+    #     print("loading checkpoint")
+    #     weights_path = "../res/train3/best_net7_snow_large_ploss_vgg19_checkpoint.pth.tar"
+    #     net = Network7(use_batchnorm=True).to(cfg.DEVICE)
+    #     weights = torch.load(weights_path)
+    #     net = load_checkpoint(weights, net)
+    #     net = net.to(cfg.DEVICE)
 
     print("preparing data")
     train_dataset = ImageDataset(clear_imgs_dir=cfg.TRAIN_CLEAR_DIR, deg_imgs_dir=cfg.TRAIN_DEG_DIR)
@@ -224,6 +213,10 @@ def train():
             save_model(net, optimizers[1], name)
 
             print("Early Stopping on epoch {}".format(epoch + 1))
+            break
+
+        if train_epoch_loss[epoch] < val_epoch_loss[epoch]:
+            print("overfitting")
             break
 
 

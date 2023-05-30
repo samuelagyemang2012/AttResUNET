@@ -12,30 +12,26 @@ from configs import train_config as cfg
 
 separate = False
 # load model
-weights_path = "../res/train18/best_netsr_b4_sa_myloss_ploss_vgg19_net7_checkpoint.pth.tar"
-deblur_weights_path = "../res/netsr_b8/best_netsr_myloss_ploss_vgg19_net7_checkpoint.pth.tar"
+weights_path = "../res/haze/net7_sots/best_net7_haze_sots_ploss_vgg19_checkpoint.pth.tar"
 
 w, h = 400, 400
+net = Network7Haze(use_batchnorm=True)
+weights = torch.load(weights_path)
+net = load_checkpoint(weights, net)
 
-if not separate:
-    net = NetworkSR3(num_blocks=4)
-    weights = torch.load(weights_path)
-    net = load_checkpoint(weights, net)
-else:
-    net = Network7(in_channels=3, out_channels=3, dropout=0.2, use_batchnorm=False)
-    refine_net = NetworkSR(num_blocks=8)
+# "C:/Users/Administrator/Desktop/datasets/snow100k/light_snow/test/syn/
+# "C:/Users/Administrator/Desktop/datasets/snow100k/light_snow/test/gt/"
+# "C:/Users/Administrator/Desktop/datasets/snow100k/light_snow/test/preds/snow_l/"
+# "C:/Users/Administrator/Desktop/datasets/dehaze/reside/OTS/training_data/val/hazy/"
+# "C:/Users/Administrator/Desktop/datasets/dehaze/reside/OTS/preds/haze/"
+# "C:/Users/Administrator/Desktop/datasets/dehaze/reside/OTS/training_data/val/clear/"
 
-    model_weights = torch.load(weights_path)
-    net = load_checkpoint(model_weights, net)
-
-    refine_weights = torch.load(deblur_weights_path)
-    refine_net = load_checkpoint(refine_weights, refine_net)
-
-images_folder_path = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/test2/deg/"
-gt_images_folder_path = "C:/Users/Administrator/Desktop/datasets/snow100k/training_data_large/test2/clear/"
-dest_folder_path = "C:/Users/Administrator/Desktop/datasets/snow100k/preds/snow_sr_sa/"
+images_folder_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/val/hazy/"
+gt_images_folder_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/training_data/SOTS/val/clear/"
+dest_folder_path = "C:/Users/Administrator/Desktop/datasets/dehaze/reside/SOTs/prediction/SOTS_outdoor/"
 
 deg_images = os.listdir(images_folder_path)
+gt_images = os.listdir(gt_images_folder_path)
 
 transform = transforms.Compose([
     transforms.Resize((w, h)),
@@ -79,36 +75,24 @@ def batch_inference():
 
     save_img = True
 
-    for i in tqdm(deg_images):
-        input_ = Image.open(images_folder_path + i).convert('RGB')
+    for i, k in enumerate(tqdm(deg_images)):
+
+        input_ = Image.open(images_folder_path + k).convert('RGB')
         input_ = transform(input_)
         input_ = input_.unsqueeze(0)
 
-        gt_ = Image.open(gt_images_folder_path + i).convert('RGB')
+        gt_ = Image.open(gt_images_folder_path + gt_images[i]).convert('RGB')
         gt_ = transform(gt_)
         gt_ = gt_.unsqueeze(0)
 
         # do inference
-        if not separate:
-            net.eval()
-            start = time.time()
-            preds = net(input_)
-            end = time.time()
+        net.eval()
+        start = time.time()
+        preds = net(input_)
+        end = time.time()
 
-            inf_time = get_inf_time(end, start)
-            inf_times.append(inf_time)
-
-        else:
-            net.eval()
-            start = time.time()
-
-            clean = net(input_)
-            preds = refine_net(clean)
-
-            end = time.time()
-
-            inf_time = get_inf_time(end, start)
-            inf_times.append(inf_time)
+        inf_time = get_inf_time(end, start)
+        inf_times.append(inf_time)
 
         preds = process_tensor(preds)
         gt = process_tensor(gt_)
@@ -122,7 +106,7 @@ def batch_inference():
         psnrs.append(psnr)
 
         if save_img:
-            cv2.imwrite(dest_folder_path + i, preds * 255)
+            cv2.imwrite(dest_folder_path + k, preds * 255)
 
     avg_inf = sum(inf_times) / len(inf_times)
     avg_ssim = sum(ssims) / len(ssims)
